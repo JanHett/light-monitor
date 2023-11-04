@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Light Monitor</title>
+    <link href="style.css" rel="stylesheet">
+</head>
+
+<body>
+    <video id="monitor"></video>
+
+    <scope-stack video-source="monitor"></scope-stack>
+
+    <form id="settings">
+        <label for="anamorphic-squeeze">
+            Anamorphic Squeeze
+            <input id="anamorphic-squeeze" type="number" value="1" step="0.1">
+        </label>
+
+        <label for="aspect-ratio">
+            Aspect Ratio
+            <input id="aspect-ratio" type="number" value="2.39" step="0.1">
+        </label>
+    </form>
+
+    <script type="module" src="app.mjs"></script>
+</body>
+
+</html>
