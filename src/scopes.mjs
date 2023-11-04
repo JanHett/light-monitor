@@ -145,6 +145,7 @@ export class ScopeStack extends HTMLElement {
 
         // --- Add-Scope Buttons ---
         const scopeButtons = document.createElement("div");
+        scopeButtons.classList.add("scope-button-container")
         for (const Scope of this.availableScopes) {
             const button = document.createElement("button");
             button.textContent = Scope.scopeName;
@@ -159,7 +160,45 @@ export class ScopeStack extends HTMLElement {
 
         // === Style ===
         const style = document.createElement("style");
-        style.textContent = ``;
+        style.textContent = `
+        :host {
+            display: flex;
+        }
+
+        .scope-stack-controls {
+            display: flex;
+            flex-direction: column;
+            margin-right: 8px;
+        }
+
+        .scope-button-container {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .scope-stack-container {
+            display: flex;
+        }
+
+        .scope-wrapper {
+            position: relative;
+        }
+
+        .scope-wrapper:not(:last-child) {
+            margin-right: 16px;
+        }
+
+        .remove-scope {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+
+            background-color: #aa122bcc;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 4px;
+        }
+        `;
 
         // === Final Assembly ===
         shadow.appendChild(style);
@@ -168,8 +207,21 @@ export class ScopeStack extends HTMLElement {
     }
 
     addScopeClicked(event, Scope) {
+        const scopeWrapper = document.createElement("div");
+
         const scope = new Scope(this.videoSource);
-        this.scopeContainer.appendChild(scope);
+        scopeWrapper.classList.add("scope-wrapper");
+        scopeWrapper.appendChild(scope);
+
+        const removeScopeBtn = document.createElement("button");
+        removeScopeBtn.textContent = "🗑️";
+        removeScopeBtn.classList.add("remove-scope");
+        removeScopeBtn.addEventListener("click", ev => {
+            this.scopeContainer.removeChild(scopeWrapper);
+        });
+        scopeWrapper.appendChild(removeScopeBtn);
+
+        this.scopeContainer.appendChild(scopeWrapper);
 
     }
 }
