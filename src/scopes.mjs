@@ -13,21 +13,9 @@ export class WaveformScope extends HTMLElement {
         this.videoSource = videoSource;
     }
 
-    resetCanvas() {
-        const ctx = this.canvas.getContext("2d", {colorSpace: "display-p3"});
-
-        ctx.fillStyle = "#aa122b";
-        ctx.fillRect(0, 0, this.canvas.clientWidth, this.canvas.clientHeight);
-    }
-
     drawWaveform() {
-        const hiddenCanvas = document.createElement("canvas");
-        hiddenCanvas.width = this.videoSource.scrollWidth;
-        hiddenCanvas.height = this.videoSource.scrollHeight;
-        const hiddenCtx = hiddenCanvas.getContext("2d", { colorSpace: "display-p3" });
-        
-        hiddenCtx.drawImage(this.videoSource, 0, 0, this.videoSource.scrollWidth, this.videoSource.scrollHeight);
-        const imgData = hiddenCtx.getImageData(0, 0, this.videoSource.scrollWidth, this.videoSource.scrollHeight);
+        this.hiddenCtx.drawImage(this.videoSource, 0, 0, this.videoSource.scrollWidth, this.videoSource.scrollHeight);
+        const imgData = this.hiddenCtx.getImageData(0, 0, this.videoSource.scrollWidth, this.videoSource.scrollHeight);
         
         const ctx = this.canvas.getContext("2d", { colorSpace: "display-p3" });
         ctx.fillStyle = "#000"
@@ -42,14 +30,21 @@ export class WaveformScope extends HTMLElement {
             }
         }
     
-        requestAnimationFrame(() => { this.drawWaveform() });
+        requestAnimationFrame(() => { if (this.keepDrawing) this.drawWaveform() });
     }
 
     connectedCallback() {
         const shadow = this.attachShadow({mode: "open"});
 
+        // === The canvas to draw on ===
         this.canvas = document.createElement("canvas");
         this.canvas.classList.add("scope-canvas");
+
+        // === A hidden canvas to get the pixel data from the video source ===
+        this.hiddenCanvas = document.createElement("canvas");
+        this.hiddenCanvas.width = this.videoSource.scrollWidth;
+        this.hiddenCanvas.height = this.videoSource.scrollHeight;
+        this.hiddenCtx = this.hiddenCanvas.getContext("2d", { colorSpace: "display-p3" });
 
         // === Style ===
         const style = document.createElement("style");
@@ -64,7 +59,12 @@ export class WaveformScope extends HTMLElement {
 
         shadow.appendChild(this.canvas);
         shadow.appendChild(style);
+        this.keepDrawing = true;
         this.drawWaveform();
+    }
+
+    disconnectedCallback() {
+        this.keepDrawing = false;
     }
 }
 
