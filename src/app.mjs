@@ -1,4 +1,9 @@
-import { ScopeStack, RGBWaveformScope, LumaWaveformScope } from "./scopes.mjs";
+import {
+    ScopeStack,
+    RGBWaveformScope,
+    LumaWaveformScope,
+    Vectorscope
+} from "./scopes.mjs";
 
 async function getCameraAccess() {
     const monitor = document.getElementById("monitor");
@@ -27,6 +32,7 @@ function registerCustomElements() {
     window.customElements.define(...ScopeStack.definition);
     window.customElements.define(...RGBWaveformScope.definition);
     window.customElements.define(...LumaWaveformScope.definition);
+    window.customElements.define(...Vectorscope.definition);
 }
 
 (async function() {

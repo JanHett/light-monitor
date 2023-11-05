@@ -1,4 +1,5 @@
-import { getPixel } from "./util.mjs"
+import { getPixel, Vec3 } from "./util.mjs"
+import { rgbToYCbCr, YCbCrToRGB } from "./color_util.mjs";
 
 class AbstractScope extends HTMLElement {
     constructor(videoSource) {
@@ -11,6 +12,113 @@ class AbstractScope extends HTMLElement {
             throw TypeError("`videoSource` must be a <video> or <canvas> element");
         }
         this.videoSource = videoSource;
+    }
+}
+
+export class Vectorscope extends AbstractScope {
+    static definition = ["vector-scope", Vectorscope];
+    static scopeId = "vectorscope"
+    static scopeName = "Vectorscope"
+
+    constructor(videoSource) {
+        super(videoSource);
+    }
+
+    connectedCallback() {
+        const shadow = this.attachShadow({mode: "open"});
+
+        // === The canvas to draw on ===
+        this.canvas = document.createElement("canvas");
+        this.canvas.classList.add("scope-canvas");
+
+        // === A hidden canvas to get the pixel data from the video source ===
+        this.hiddenCanvas = document.createElement("canvas");
+        this.hiddenCanvas.width = this.videoSource.scrollWidth;
+        this.hiddenCanvas.height = this.videoSource.scrollHeight;
+        this.hiddenCtx = this.hiddenCanvas.getContext("2d", { colorSpace: "display-p3" });
+
+        // === Style ===
+        const style = document.createElement("style");
+        style.textContent = `
+        :host {
+            height: 100%;
+            aspect-ratio: 1;
+            display: block;
+            /* border: 1px solid #fff; */
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .scope-canvas {
+        }
+        `;
+
+        shadow.appendChild(this.canvas);
+        shadow.appendChild(style);
+
+        this.canvas.width = this.clientWidth;
+        this.canvas.height = this.clientHeight;
+
+        this.keepDrawing = true;
+        this.drawVectorscope();
+    }
+
+    drawVectorscope() {
+        this.canvas.width = this.clientWidth;
+        this.canvas.height = this.clientHeight;
+
+        this.hiddenCtx.drawImage(this.videoSource, 0, 0, this.videoSource.scrollWidth, this.videoSource.scrollHeight);
+        const imgData = this.hiddenCtx.getImageData(0, 0, this.videoSource.scrollWidth, this.videoSource.scrollHeight);
+        
+        const ctx = this.canvas.getContext("2d", { colorSpace: "display-p3" });
+        
+        ctx.fillStyle = "#000"
+        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        for (let scaleCr = 0; scaleCr < this.canvas.height; ++scaleCr) {
+            const Cr = (scaleCr / this.canvas.height - 0.5) * 255;
+            for (let scaleCb = 0; scaleCb < this.canvas.width; ++scaleCb) {
+                const Cb = (scaleCb / this.canvas.width - 0.5) * 255;
+
+                const [r, g, b] = YCbCrToRGB(Vec3.fromValues(1, Cb, Cr)).elements;
+
+                ctx.fillStyle = `rgb(${r}, ${g}, ${b})`
+                ctx.fillRect(scaleCb, scaleCr, 1, 1);
+            }
+        }
+
+        const centerX = this.canvas.width / 2;
+        const centerY = this.canvas.height / 2;
+
+        ctx.beginPath()
+        ctx.ellipse(
+            centerX, centerY,
+            this.canvas.width / 2, this.canvas.height / 2,
+            0, 0, 360,
+        );
+        ctx.strokeStyle = "#fff";
+        ctx.stroke();
+
+        ctx.fillStyle = "rgba(255,255,255, 0.1)";
+        const stride = Math.ceil(imgData.width / 360);
+        for (let y = 0; y < imgData.height; y += stride) {
+            for (let x = 0; x < imgData.width; x += stride) {
+                const [r, g, b] = getPixel(imgData, x, y);
+
+                const [Y, Cb, Cr] = rgbToYCbCr(Vec3.fromValues(r, g, b)).elements;
+
+                ctx.fillRect(
+                    Cb / 255 * this.canvas.width + centerX,
+                    Cr / 255 * this.canvas.height + centerY,
+                    1, 1
+                );
+            }
+        }
+
+        requestAnimationFrame(() => { if (this.keepDrawing) this.drawVectorscope() });
+    }
+
+    disconnectedCallback() {
+        this.keepDrawing = false;
     }
 }
 
@@ -125,7 +233,7 @@ export class LumaWaveformScope extends AbstractWaveformScope {
 export class ScopeStack extends HTMLElement {
     static definition = ["scope-stack", ScopeStack];
 
-    constructor(availableScopes = [RGBWaveformScope, LumaWaveformScope]) {
+    constructor(availableScopes = [RGBWaveformScope, LumaWaveformScope, Vectorscope]) {
         super();
 
         this.availableScopes = availableScopes;
