@@ -1,6 +1,6 @@
 import { getPixel } from "./util.mjs"
 
-export class WaveformScope extends HTMLElement {
+class AbstractScope extends HTMLElement {
     constructor(videoSource) {
         super();
 
@@ -12,15 +12,26 @@ export class WaveformScope extends HTMLElement {
         }
         this.videoSource = videoSource;
     }
+}
+
+class AbstractWaveformScope extends AbstractScope {
+    constructor(videoSource, guidelines = [0.1, 0.8]) {
+        super(videoSource);
+        this.guidelines = guidelines;
+    }
 
     drawWaveform() {
+        this.canvas.width = this.clientWidth;
+        this.canvas.height = this.clientHeight;
+
         this.hiddenCtx.drawImage(this.videoSource, 0, 0, this.videoSource.scrollWidth, this.videoSource.scrollHeight);
         const imgData = this.hiddenCtx.getImageData(0, 0, this.videoSource.scrollWidth, this.videoSource.scrollHeight);
         
         const ctx = this.canvas.getContext("2d", { colorSpace: "display-p3" });
+        
         ctx.fillStyle = "#000"
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-    
+        
         for (let x = 0; x < this.canvas.width; ++x) {
             const relativeX = x / this.canvas.width
             const imgX = Math.round(relativeX * imgData.width);
@@ -28,6 +39,11 @@ export class WaveformScope extends HTMLElement {
                 const [r, g, b] = getPixel(imgData, imgX, y);
                 this.drawWaveformDot(x, r, g, b, ctx);
             }
+        }
+
+        ctx.fillStyle = "#fffc";
+        for (const guideline of this.guidelines) {
+            ctx.fillRect(0, (1 - guideline) * this.canvas.height, this.canvas.width, 1);
         }
     
         requestAnimationFrame(() => { if (this.keepDrawing) this.drawWaveform() });
@@ -49,16 +65,24 @@ export class WaveformScope extends HTMLElement {
         // === Style ===
         const style = document.createElement("style");
         style.textContent = `
-        .scope-canvas {
+        :host {
             height: 100%;
             aspect-ratio: 4/3;
-            border: 1px solid #fff;
+            display: block;
+            /* border: 1px solid #fff; */
             border-radius: 8px;
+            overflow: hidden;
+        }
+        .scope-canvas {
         }
         `;
 
         shadow.appendChild(this.canvas);
         shadow.appendChild(style);
+
+        this.canvas.width = this.clientWidth;
+        this.canvas.height = this.clientHeight;
+
         this.keepDrawing = true;
         this.drawWaveform();
     }
@@ -68,7 +92,7 @@ export class WaveformScope extends HTMLElement {
     }
 }
 
-export class RGBWaveformScope extends WaveformScope {
+export class RGBWaveformScope extends AbstractWaveformScope {
     static definition = ["rgb-waveform-scope", RGBWaveformScope];
     static scopeId = "rgb-waveform"
     static scopeName = "RGB Waveform"
@@ -84,7 +108,7 @@ export class RGBWaveformScope extends WaveformScope {
     }
 }
 
-export class LumaWaveformScope extends WaveformScope {
+export class LumaWaveformScope extends AbstractWaveformScope {
     static definition = ["luma-waveform-scope", LumaWaveformScope];
     static scopeId = "luma-waveform"
     static scopeName = "Luma Waveform"
