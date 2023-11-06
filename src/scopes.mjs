@@ -20,8 +20,9 @@ export class Vectorscope extends AbstractScope {
     static scopeId = "vectorscope"
     static scopeName = "Vectorscope"
 
-    constructor(videoSource) {
+    constructor(videoSource, markers = [0.75, 1.0]) {
         super(videoSource);
+        this.markers = markers;
     }
 
     connectedCallback() {
@@ -74,12 +75,13 @@ export class Vectorscope extends AbstractScope {
         ctx.fillStyle = "#000"
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
+        // === colour in the background ===
         for (let scaleCr = 0; scaleCr < this.canvas.height; ++scaleCr) {
             const Cr = (scaleCr / this.canvas.height - 0.5) * 255;
             for (let scaleCb = 0; scaleCb < this.canvas.width; ++scaleCb) {
                 const Cb = (scaleCb / this.canvas.width - 0.5) * 255;
 
-                const [r, g, b] = YCbCrToRGB(Vec3.fromValues(1, Cb, Cr)).elements;
+                const [r, g, b] = YCbCrToRGB(Vec3.fromValues(128, Cb, Cr)).elements;
 
                 ctx.fillStyle = `rgb(${r}, ${g}, ${b})`
                 ctx.fillRect(scaleCb, scaleCr, 1, 1);
@@ -89,15 +91,35 @@ export class Vectorscope extends AbstractScope {
         const centerX = this.canvas.width / 2;
         const centerY = this.canvas.height / 2;
 
-        ctx.beginPath()
-        ctx.ellipse(
-            centerX, centerY,
-            this.canvas.width / 2, this.canvas.height / 2,
-            0, 0, 360,
-        );
-        ctx.strokeStyle = "#fff";
-        ctx.stroke();
+        // === draw R/G/B and C/M/Y saturation markers
+        ctx.fillStyle = "rgb(64, 64, 64)";
+        const markerSize = 11;
+        for (const axis of [
+            Vec3.fromValues(255, 0, 0),
+            Vec3.fromValues(0, 255, 0),
+            Vec3.fromValues(0, 0, 255),
+            Vec3.fromValues(255, 255, 0),
+            Vec3.fromValues(0, 255, 255),
+            Vec3.fromValues(255, 0, 255),
+        ]) {
+            for (const marker of this.markers) {
+                const YCbCr = rgbToYCbCr(axis).mul(marker);
+                const [Y, Cb, Cr] = YCbCr.elements;
 
+                ctx.fillRect(
+                    Math.floor(Cb / 255 * this.canvas.width) + centerX - Math.floor(markerSize / 2),
+                    Math.floor(Cr / 255 * this.canvas.height) + centerY - 1,
+                    markerSize, 3
+                );
+                ctx.fillRect(
+                    Math.floor(Cb / 255 * this.canvas.width) + centerX - 1,
+                    Math.floor(Cr / 255 * this.canvas.height) + centerY - Math.floor(markerSize / 2),
+                    3, markerSize
+                );
+            }
+        }
+
+        // === draw the sample dots ===
         ctx.fillStyle = "rgba(255,255,255, 0.1)";
         const stride = Math.ceil(imgData.width / 360);
         for (let y = 0; y < imgData.height; y += stride) {

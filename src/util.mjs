@@ -22,16 +22,27 @@ export class Vec3 {
 
     get(el) { return this.elements[el]; }
 
+    /** @param {Number} rhs */
+    mulScalar(rhs) {
+        const res = new Vec3;
+        res.elements[0] = this.get(0) * rhs;
+        res.elements[1] = this.get(1) * rhs;
+        res.elements[2] = this.get(2) * rhs;
+
+        return res;
+    }
+
+    /** @param {Vec3} rhs */
     mulVec3(rhs) {
         const res = new Vec3;
         res.elements[0] = this.get(0) * rhs.get(0);
         res.elements[1] = this.get(1) * rhs.get(1);
         res.elements[2] = this.get(2) * rhs.get(2);
+
+        return res;
     }
 
-    /**
-     * @param {Mat3} rhs
-     */
+    /** @param {Mat3} rhs */
     mulMat3(rhs) {
         const res = new Vec3;
         res.elements[0] = this.get(0) * rhs.get(0, 0)
@@ -47,7 +58,9 @@ export class Vec3 {
         return res;
     }
 
+    /** @param {Number | Vec3 | Mat3} rhs */
     mul(rhs) {
+        if (typeof rhs === "number") return this.mulScalar(rhs);
         if (rhs instanceof Vec3) return this.mulVec3(rhs);
         if (rhs instanceof Mat3) return this.mulMat3(rhs);
         throw TypeError(`Cannot multiply \`Vec3\` by \`${rhs.constructor.name}\``);
