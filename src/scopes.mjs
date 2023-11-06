@@ -1,17 +1,19 @@
 import { getPixel, Vec3 } from "./util.mjs"
 import { rgbToYCbCr, YCbCrToRGB } from "./color_util.mjs";
+import { VideoSource } from "./video_source.mjs";
 
 class AbstractScope extends HTMLElement {
     constructor(videoSource) {
         super();
-
-        if (!(
-            videoSource instanceof HTMLVideoElement
-            || videoSource instanceof HTMLCanvasElement
-        )) {
-            throw TypeError("`videoSource` must be a <video> or <canvas> element");
-        }
         this.videoSource = videoSource;
+
+        this.frameListener = this.videoSource.addEventListener("frame", (event, imgData) => {
+            this.drawScope(imgData)
+        });
+    }
+
+    disconnectedCallback() {
+        this.videoSource.removeEventListener("frame", this.frameListener);
     }
 }
 
@@ -31,12 +33,6 @@ export class Vectorscope extends AbstractScope {
         // === The canvas to draw on ===
         this.canvas = document.createElement("canvas");
         this.canvas.classList.add("scope-canvas");
-
-        // === A hidden canvas to get the pixel data from the video source ===
-        this.hiddenCanvas = document.createElement("canvas");
-        this.hiddenCanvas.width = this.videoSource.scrollWidth;
-        this.hiddenCanvas.height = this.videoSource.scrollHeight;
-        this.hiddenCtx = this.hiddenCanvas.getContext("2d", { colorSpace: "display-p3" });
 
         // === Style ===
         const style = document.createElement("style");
@@ -58,18 +54,12 @@ export class Vectorscope extends AbstractScope {
 
         this.canvas.width = this.clientWidth;
         this.canvas.height = this.clientHeight;
-
-        this.keepDrawing = true;
-        this.drawVectorscope();
     }
 
-    drawVectorscope() {
+    drawScope(imgData) {
         this.canvas.width = this.clientWidth;
         this.canvas.height = this.clientHeight;
 
-        this.hiddenCtx.drawImage(this.videoSource, 0, 0, this.videoSource.scrollWidth, this.videoSource.scrollHeight);
-        const imgData = this.hiddenCtx.getImageData(0, 0, this.videoSource.scrollWidth, this.videoSource.scrollHeight);
-        
         const ctx = this.canvas.getContext("2d", { colorSpace: "display-p3" });
         
         ctx.fillStyle = "#000"
@@ -135,12 +125,6 @@ export class Vectorscope extends AbstractScope {
                 );
             }
         }
-
-        requestAnimationFrame(() => { if (this.keepDrawing) this.drawVectorscope() });
-    }
-
-    disconnectedCallback() {
-        this.keepDrawing = false;
     }
 }
 
@@ -150,13 +134,10 @@ class AbstractWaveformScope extends AbstractScope {
         this.guidelines = guidelines;
     }
 
-    drawWaveform() {
+    drawScope(imgData) {
         this.canvas.width = this.clientWidth;
         this.canvas.height = this.clientHeight;
 
-        this.hiddenCtx.drawImage(this.videoSource, 0, 0, this.videoSource.scrollWidth, this.videoSource.scrollHeight);
-        const imgData = this.hiddenCtx.getImageData(0, 0, this.videoSource.scrollWidth, this.videoSource.scrollHeight);
-        
         const ctx = this.canvas.getContext("2d", { colorSpace: "display-p3" });
         
         ctx.fillStyle = "#000"
@@ -175,8 +156,6 @@ class AbstractWaveformScope extends AbstractScope {
         for (const guideline of this.guidelines) {
             ctx.fillRect(0, (1 - guideline) * this.canvas.height, this.canvas.width, 1);
         }
-    
-        requestAnimationFrame(() => { if (this.keepDrawing) this.drawWaveform() });
     }
 
     connectedCallback() {
@@ -185,12 +164,6 @@ class AbstractWaveformScope extends AbstractScope {
         // === The canvas to draw on ===
         this.canvas = document.createElement("canvas");
         this.canvas.classList.add("scope-canvas");
-
-        // === A hidden canvas to get the pixel data from the video source ===
-        this.hiddenCanvas = document.createElement("canvas");
-        this.hiddenCanvas.width = this.videoSource.scrollWidth;
-        this.hiddenCanvas.height = this.videoSource.scrollHeight;
-        this.hiddenCtx = this.hiddenCanvas.getContext("2d", { colorSpace: "display-p3" });
 
         // === Style ===
         const style = document.createElement("style");
@@ -212,13 +185,6 @@ class AbstractWaveformScope extends AbstractScope {
 
         this.canvas.width = this.clientWidth;
         this.canvas.height = this.clientHeight;
-
-        this.keepDrawing = true;
-        this.drawWaveform();
-    }
-
-    disconnectedCallback() {
-        this.keepDrawing = false;
     }
 }
 
@@ -268,14 +234,14 @@ export class ScopeStack extends HTMLElement {
         const videoSourceId = this.getAttribute("video-source");
         if (!videoSourceId) throw TypeError("`video-source` must be specified");
 
-        const videoSource = document.getElementById(videoSourceId);
+        const videoSourceElement = document.getElementById(videoSourceId);
         if (!(
-            videoSource instanceof HTMLVideoElement
-            || videoSource instanceof HTMLCanvasElement
+            videoSourceElement instanceof HTMLVideoElement
+            || videoSourceElement instanceof HTMLCanvasElement
         )) {
             throw TypeError("`video-source` must refer to a <video> or <canvas> element");
         }
-        this.videoSource = videoSource;
+        this.videoSource = new VideoSource(videoSourceElement, "display-p3");
 
         // === The control box ===
         const controls = document.createElement("div");
