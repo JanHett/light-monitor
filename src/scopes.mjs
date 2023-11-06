@@ -1,5 +1,7 @@
+import * as twgl from "../external/twgl/dist/5.x/twgl-full.module.js"
+
 import { getPixel, Vec3 } from "./util.mjs"
-import { rgbToYCbCr, YCbCrToRGB } from "./color_util.mjs";
+import { rgbToYCbCr, YCbCrToRGB, GLSL_COLORSPACE_CONVERSION } from "./color_util.mjs";
 import { VideoSource } from "./video_source.mjs";
 
 class AbstractScope extends HTMLElement {
@@ -21,6 +23,104 @@ export class Vectorscope extends AbstractScope {
     static definition = ["vector-scope", Vectorscope];
     static scopeId = "vectorscope"
     static scopeName = "Vectorscope"
+
+    static RENDERER = "webgl"
+    // static RENDERER = "2d"
+
+    static distribution_vs = `
+    ${GLSL_COLORSPACE_CONVERSION}
+
+    // -------------------------------------------------------------------------
+
+    attribute float pixelId;
+    uniform sampler2D source_img;
+    uniform vec2 resolution;
+
+    void main() {
+        vec2 pixel = vec2(mod(pixelId, resolution.x), floor(pixelId / resolution.x));
+        vec2 uv = (pixel / resolution);
+
+        vec4 pixel_rgb = texture2D(source_img, uv);
+        vec2 pixel_CbCr = rgbToYCbCr(pixel_rgb.rgb).yz;
+
+        gl_Position = vec4(pixel_CbCr, 0., 1.);
+    }
+    `;
+    static distribution_fs = `
+    precision mediump float;
+    void main() {
+        gl_FragColor = vec4(1);
+    }
+    `;
+
+    static background_vs = `
+    attribute vec4 position;
+
+    void main() {
+        gl_Position = position;
+    }
+    `;
+
+    static background_fs = `
+    precision mediump float;
+
+    // -------------------------------------------------------------------------
+
+    float sdCircle(vec2 p, float r)
+    {
+        return length(p) - r;
+    }
+
+    float opOnion(in float sd, in float r)
+    {
+    return abs(sd) - r;
+    }
+
+    ${GLSL_COLORSPACE_CONVERSION}
+
+    // -------------------------------------------------------------------------
+
+    uniform sampler2D source_img;
+    uniform vec2 resolution;
+
+    void main() {
+        vec2 CbCr = (gl_FragCoord.xy / resolution) - vec2(0.5, 0.5);
+        //gl_FragColor = texture2D(source_img, CbCr);
+
+        gl_FragColor = vec4(YCbCrToRGB(vec3(0.5, CbCr)), 1.);
+        
+        // markers
+        vec2 safe_r = rgbToYCbCr(vec3(0.75, 0, 0)).yz;
+        vec2 safe_g = rgbToYCbCr(vec3(0, 0.75, 0)).yz;
+        vec2 safe_b = rgbToYCbCr(vec3(0, 0, 0.75)).yz;
+        vec2 safe_c = rgbToYCbCr(vec3(0, 0.75, 0.75)).yz;
+        vec2 safe_m = rgbToYCbCr(vec3(0.75, 0, 0.75)).yz;
+        vec2 safe_y = rgbToYCbCr(vec3(0.75, 0.75, 0)).yz;
+
+        if (opOnion(sdCircle(CbCr - safe_r, 0.02), 0.004) < 0.) {
+            gl_FragColor = vec4(1.);
+        }
+        if (opOnion(sdCircle(CbCr - safe_g, 0.02), 0.004) < 0.) {
+            gl_FragColor = vec4(1.);
+        }
+        if (opOnion(sdCircle(CbCr - safe_b, 0.02), 0.004) < 0.) {
+            gl_FragColor = vec4(1.);
+        }
+        if (opOnion(sdCircle(CbCr - safe_c, 0.02), 0.002) < 0.) {
+            gl_FragColor = vec4(1.);
+        }
+        if (opOnion(sdCircle(CbCr - safe_m, 0.02), 0.002) < 0.) {
+            gl_FragColor = vec4(1.);
+        }
+        if (opOnion(sdCircle(CbCr - safe_y, 0.02), 0.002) < 0.) {
+            gl_FragColor = vec4(1.);
+        }
+    }
+    `;
+
+    static backgroundArrays = {
+        position: [-1, -1, 0, 1, -1, 0, -1, 1, 0, -1, 1, 0, 1, -1, 0, 1, 1, 0],
+    };
 
     constructor(videoSource, markers = [0.75, 1.0]) {
         super(videoSource);
@@ -54,9 +154,66 @@ export class Vectorscope extends AbstractScope {
 
         this.canvas.width = this.clientWidth;
         this.canvas.height = this.clientHeight;
+
+        if (Vectorscope.RENDERER === "webgl") {
+            const gl = this.canvas.getContext("webgl", { colorSpace: "display-p3" });
+            this.backgroundProgramInfo = twgl.createProgramInfo(gl,
+                [Vectorscope.background_vs, Vectorscope.background_fs]);
+            this.backgroundBufferInfo = twgl.createBufferInfoFromArrays(gl, Vectorscope.backgroundArrays);
+            
+            this.distributionProgramInfo = twgl.createProgramInfo(gl,
+                [Vectorscope.distribution_vs, Vectorscope.distribution_fs]);
+        }
     }
 
     drawScope(imgData) {
+        if (Vectorscope.RENDERER === "webgl") return this.drawScopeGL(imgData);
+        else return this.drawScope2d(imgData);
+    }
+
+    drawScopeGL(imgData) {
+        this.canvas.width = this.clientWidth;
+        this.canvas.height = this.clientHeight;
+
+        const gl = this.canvas.getContext("webgl", { colorSpace: "display-p3" });
+
+        gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
+        // --- draw the background ---
+
+        gl.useProgram(this.backgroundProgramInfo.program);
+        twgl.setBuffersAndAttributes(gl, this.backgroundProgramInfo, this.backgroundBufferInfo);
+        const imgTex = twgl.createTexture(gl, {
+            src: imgData // TODO: get iamge data directly off the video
+        });
+        twgl.setUniforms(this.backgroundProgramInfo, {
+            source_img: imgTex,
+            resolution: [gl.canvas.width, gl.canvas.height],
+        });
+        twgl.drawBufferInfo(gl, this.backgroundBufferInfo);
+
+        // --- draw the vectorscope distribution ---
+
+        gl.useProgram(this.distributionProgramInfo.program);
+        // create Float32Array with items containing their indeces
+        const pixelIds = new Float32Array(Array(imgData.width * imgData.height).keys());
+        const pixelIdBufferInfo = twgl.createBufferInfoFromArrays(gl, {
+            pixelId: {
+                size: 1,
+                data: pixelIds,
+            },
+        });
+
+        twgl.setBuffersAndAttributes(gl, this.distributionProgramInfo, pixelIdBufferInfo);
+        twgl.setUniforms(this.distributionProgramInfo, {
+            source_img: imgTex,
+            resolution: [imgData.width, imgData.height],
+        });
+
+        twgl.drawBufferInfo(gl, pixelIdBufferInfo);
+    }
+    
+    drawScope2d(imgData) {
         this.canvas.width = this.clientWidth;
         this.canvas.height = this.clientHeight;
 
@@ -313,10 +470,10 @@ export class ScopeStack extends HTMLElement {
             top: 8px;
             left: 8px;
 
-            background-color: #aa122bcc;
+            /* background-color: #aa122bcc;
             border: none;
             border-radius: 4px;
-            padding: 8px 4px;
+            padding: 8px 4px; */
         }
         `;
 

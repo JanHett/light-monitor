@@ -27,7 +27,7 @@ export class VideoSource {
             "frame": {}
         }
 
-        this.readSourcePixels();
+        requestAnimationFrame(() => this.readSourcePixels());
     }
 
     readSourcePixels() {
