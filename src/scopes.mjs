@@ -49,7 +49,7 @@ export class Vectorscope extends AbstractScope {
     static distribution_fs = `
     precision mediump float;
     void main() {
-        gl_FragColor = vec4(1);
+        gl_FragColor = vec4(1.);
     }
     `;
 
@@ -196,12 +196,11 @@ export class Vectorscope extends AbstractScope {
 
         gl.useProgram(this.distributionProgramInfo.program);
         // create Float32Array with items containing their indeces
-        const pixelIds = new Float32Array(Array(imgData.width * imgData.height).keys());
+        const nPixels = imgData.width * imgData.height;
+        const pixelIds = new Float32Array(nPixels);
+        for (let i = 0; i < nPixels; ++i) pixelIds[i] = i;
         const pixelIdBufferInfo = twgl.createBufferInfoFromArrays(gl, {
-            pixelId: {
-                size: 1,
-                data: pixelIds,
-            },
+            pixelId: { size: 1, data: pixelIds },
         });
 
         twgl.setBuffersAndAttributes(gl, this.distributionProgramInfo, pixelIdBufferInfo);
