@@ -29,7 +29,7 @@ export class Vectorscope extends AbstractScope {
         vec2 uv = (pixel / resolution);
 
         vec4 pixel_rgb = texture2D(source_img, uv);
-        vec2 pixel_CbCr = rgbToYCbCr(pixel_rgb.rgb).yz;
+        vec2 pixel_CbCr = rgbToYCbCr(pixel_rgb.rgb).yz * 2.;
 
         gl_Position = vec4(pixel_CbCr, 0., 1.);
     }
