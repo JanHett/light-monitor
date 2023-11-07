@@ -1,6 +1,7 @@
 import * as twgl from "../external/twgl/dist/5.x/twgl-full.module.js"
 
 import { getPixel, Vec3 } from "./util.mjs"
+import { glsl } from "./glsl_util.mjs";
 import { rgbToYCbCr, YCbCrToRGB, GLSL_COLORSPACE_CONVERSION } from "./color_util.mjs";
 import { VideoSource } from "./video_source.mjs";
 import { DRAW_ANTIALIASED, SD_OPS, SD_SHAPES } from "./sdf_util.mjs";
@@ -28,7 +29,7 @@ export class Vectorscope extends AbstractScope {
     static RENDERER = "webgl"
     // static RENDERER = "2d"
 
-    static distribution_vs = `
+    static distribution_vs = glsl`
     ${GLSL_COLORSPACE_CONVERSION}
 
     // -------------------------------------------------------------------------
@@ -47,14 +48,14 @@ export class Vectorscope extends AbstractScope {
         gl_Position = vec4(pixel_CbCr, 0., 1.);
     }
     `;
-    static distribution_fs = `
+    static distribution_fs = glsl`
     precision mediump float;
     void main() {
         gl_FragColor = vec4(1.);
     }
     `;
 
-    static background_vs = `
+    static background_vs = glsl`
     attribute vec4 position;
 
     void main() {
@@ -62,7 +63,7 @@ export class Vectorscope extends AbstractScope {
     }
     `;
 
-    static background_fs = `
+    static background_fs = glsl`
     precision mediump float;
 
     ${SD_OPS}
