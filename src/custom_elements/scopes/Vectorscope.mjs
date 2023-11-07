@@ -1,9 +1,9 @@
-import * as twgl from "../../external/twgl/dist/5.x/twgl-full.module.js"
+import * as twgl from "../../../external/twgl/dist/5.x/twgl-full.module.js"
 
-import { getPixel, Vec3 } from "../util/util.mjs"
-import { glsl } from "../util/glsl_util.mjs";
-import { rgbToYCbCr, YCbCrToRGB, GLSL_COLORSPACE_CONVERSION } from "../util/color_util.mjs";
-import { DRAW_ANTIALIASED, SD_OPS, SD_SHAPES } from "../util/sdf_util.mjs";
+import { getPixel, Vec3 } from "../../util/util.mjs"
+import { glsl } from "../../util/glsl_util.mjs";
+import { rgbToYCbCr, YCbCrToRGB, GLSL_COLORSPACE_CONVERSION } from "../../util/color_util.mjs";
+import { DRAW_ANTIALIASED, SD_OPS, SD_SHAPES } from "../../util/sdf_util.mjs";
 
 import { AbstractScope } from "./AbstractScope.mjs";
 

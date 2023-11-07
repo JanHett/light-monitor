@@ -1,4 +1,4 @@
-import { VideoSource } from "../VideoSource.mjs";
+import { VideoSource } from "../../VideoSource.mjs";
 
 import { Vectorscope } from "./Vectorscope.mjs";
 import { RGBWaveformScope, LumaWaveformScope } from "./WaveformScope.mjs";

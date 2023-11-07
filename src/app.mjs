@@ -1,6 +1,6 @@
-import { ScopeStack } from "./scopes/ScopeStack.mjs";
-import { Vectorscope } from "./scopes/Vectorscope.mjs";
-import { RGBWaveformScope, LumaWaveformScope } from "./scopes/WaveformScope.mjs";
+import { ScopeStack } from "./custom_elements/scopes/ScopeStack.mjs";
+import { Vectorscope } from "./custom_elements/scopes/Vectorscope.mjs";
+import { RGBWaveformScope, LumaWaveformScope } from "./custom_elements/scopes/WaveformScope.mjs";
 
 async function getCameraAccess() {
     const monitor = document.getElementById("monitor");

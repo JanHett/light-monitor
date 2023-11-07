@@ -1,4 +1,4 @@
-import { getPixel } from "../util/util.mjs"
+import { getPixel } from "../../util/util.mjs"
 
 import { AbstractScope } from "./AbstractScope.mjs";
 
