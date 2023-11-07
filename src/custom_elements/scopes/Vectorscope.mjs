@@ -8,7 +8,7 @@ import { DRAW_ANTIALIASED, SD_OPS, SD_SHAPES } from "../../util/sdf_util.mjs";
 import { AbstractScope } from "./AbstractScope.mjs";
 
 export class Vectorscope extends AbstractScope {
-    static definition = ["vector-scope", Vectorscope];
+    static definition = ["bz-vectorscope", Vectorscope];
     static scopeId = "vectorscope"
     static scopeName = "Vectorscope"
 

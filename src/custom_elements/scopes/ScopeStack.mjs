@@ -4,7 +4,7 @@ import { Vectorscope } from "./Vectorscope.mjs";
 import { RGBWaveformScope, LumaWaveformScope } from "./WaveformScope.mjs";
 
 export class ScopeStack extends HTMLElement {
-    static definition = ["scope-stack", ScopeStack];
+    static definition = ["bz-scope-stack", ScopeStack];
 
     constructor(availableScopes = [RGBWaveformScope, LumaWaveformScope, Vectorscope]) {
         super();

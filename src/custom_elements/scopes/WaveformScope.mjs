@@ -63,7 +63,7 @@ class AbstractWaveformScope extends AbstractScope {
 }
 
 export class RGBWaveformScope extends AbstractWaveformScope {
-    static definition = ["rgb-waveform-scope", RGBWaveformScope];
+    static definition = ["bz-rgb-waveform-scope", RGBWaveformScope];
     static scopeId = "rgb-waveform"
     static scopeName = "RGB Waveform"
 
@@ -79,7 +79,7 @@ export class RGBWaveformScope extends AbstractWaveformScope {
 }
 
 export class LumaWaveformScope extends AbstractWaveformScope {
-    static definition = ["luma-waveform-scope", LumaWaveformScope];
+    static definition = ["bz-luma-waveform-scope", LumaWaveformScope];
     static scopeId = "luma-waveform"
     static scopeName = "Luma Waveform"
 
