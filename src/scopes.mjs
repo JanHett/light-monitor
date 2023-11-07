@@ -3,6 +3,7 @@ import * as twgl from "../external/twgl/dist/5.x/twgl-full.module.js"
 import { getPixel, Vec3 } from "./util.mjs"
 import { rgbToYCbCr, YCbCrToRGB, GLSL_COLORSPACE_CONVERSION } from "./color_util.mjs";
 import { VideoSource } from "./video_source.mjs";
+import { DRAW_ANTIALIASED, SD_OPS, SD_SHAPES } from "./sdf_util.mjs";
 
 class AbstractScope extends HTMLElement {
     constructor(videoSource) {
@@ -64,21 +65,10 @@ export class Vectorscope extends AbstractScope {
     static background_fs = `
     precision mediump float;
 
-    // -------------------------------------------------------------------------
-
-    float sdCircle(vec2 p, float r)
-    {
-        return length(p) - r;
-    }
-
-    float opOnion(in float sd, in float r)
-    {
-    return abs(sd) - r;
-    }
-
+    ${SD_OPS}
+    ${SD_SHAPES}
+    ${DRAW_ANTIALIASED}
     ${GLSL_COLORSPACE_CONVERSION}
-
-    // -------------------------------------------------------------------------
 
     uniform sampler2D source_img;
     uniform vec2 resolution;
@@ -87,7 +77,7 @@ export class Vectorscope extends AbstractScope {
         vec2 CbCr = (gl_FragCoord.xy / resolution) - vec2(0.5, 0.5);
         //gl_FragColor = texture2D(source_img, CbCr);
 
-        gl_FragColor = vec4(YCbCrToRGB(vec3(0.5, CbCr)), 1.);
+        vec3 col = YCbCrToRGB(vec3(0.5, CbCr));
         
         // markers
         vec2 safe_r = rgbToYCbCr(vec3(0.75, 0, 0)).yz;
@@ -97,24 +87,21 @@ export class Vectorscope extends AbstractScope {
         vec2 safe_m = rgbToYCbCr(vec3(0.75, 0, 0.75)).yz;
         vec2 safe_y = rgbToYCbCr(vec3(0.75, 0.75, 0)).yz;
 
-        if (opOnion(sdCircle(CbCr - safe_r, 0.02), 0.004) < 0.) {
-            gl_FragColor = vec4(1.);
-        }
-        if (opOnion(sdCircle(CbCr - safe_g, 0.02), 0.004) < 0.) {
-            gl_FragColor = vec4(1.);
-        }
-        if (opOnion(sdCircle(CbCr - safe_b, 0.02), 0.004) < 0.) {
-            gl_FragColor = vec4(1.);
-        }
-        if (opOnion(sdCircle(CbCr - safe_c, 0.02), 0.002) < 0.) {
-            gl_FragColor = vec4(1.);
-        }
-        if (opOnion(sdCircle(CbCr - safe_m, 0.02), 0.002) < 0.) {
-            gl_FragColor = vec4(1.);
-        }
-        if (opOnion(sdCircle(CbCr - safe_y, 0.02), 0.002) < 0.) {
-            gl_FragColor = vec4(1.);
-        }
+        float aa_smoothing = 1.5 / resolution.x;
+        col = draw_aa(vec3(1.), col, aa_smoothing,
+            opOnion(sdCircle(CbCr - safe_r, 0.02), 0.002));
+        col = draw_aa(vec3(1.), col, aa_smoothing,
+            opOnion(sdCircle(CbCr - safe_g, 0.02), 0.002));
+        col = draw_aa(vec3(1.), col, aa_smoothing,
+            opOnion(sdCircle(CbCr - safe_b, 0.02), 0.002));
+        col = draw_aa(vec3(1.), col, aa_smoothing,
+            opOnion(sdCircle(CbCr - safe_c, 0.02), 0.0002));
+        col = draw_aa(vec3(1.), col, aa_smoothing,
+            opOnion(sdCircle(CbCr - safe_m, 0.02), 0.0002));
+        col = draw_aa(vec3(1.), col, aa_smoothing,
+            opOnion(sdCircle(CbCr - safe_y, 0.02), 0.0002));
+
+        gl_FragColor = vec4(col, 1.);
     }
     `;
 
