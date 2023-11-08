@@ -20,11 +20,16 @@ body {
     background-color: #222;
 }
 
-#monitor {
+/* #monitor {
     width: 100%;
     height: auto;
     object-fit: cover;
     transform-origin: center;
+} */
+
+bz-monitor {
+    width: 100%;
+    height: auto;
 }
 
 #settings {

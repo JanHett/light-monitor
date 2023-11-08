@@ -1,18 +1,7 @@
+import { Monitor } from "./custom_elements/Monitor.mjs";
 import { ScopeStack } from "./custom_elements/scopes/ScopeStack.mjs";
 import { Vectorscope } from "./custom_elements/scopes/Vectorscope.mjs";
 import { RGBWaveformScope, LumaWaveformScope } from "./custom_elements/scopes/WaveformScope.mjs";
-
-async function getCameraAccess() {
-    const monitor = document.getElementById("monitor");
-
-    const videoStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: false
-    });
-
-    monitor.srcObject = videoStream;
-    monitor.play();
-}
 
 function setupGuiHandlers(inputHandlers) {
     for (const inputId in inputHandlers) {
@@ -26,18 +15,12 @@ function setupGuiHandlers(inputHandlers) {
 }
 
 function registerCustomElements() {
+    window.customElements.define(...Monitor.definition);
     window.customElements.define(...ScopeStack.definition);
     window.customElements.define(...RGBWaveformScope.definition);
     window.customElements.define(...LumaWaveformScope.definition);
     window.customElements.define(...Vectorscope.definition);
 }
-
-(async function() {
-    registerCustomElements();
-    await getCameraAccess();
-
-    new App();
-})();
 
 class App {
     constructor() {
@@ -59,3 +42,9 @@ class App {
         setupGuiHandlers(inputHandlers);
     }
 }
+
+(async function() {
+    registerCustomElements();
+
+    new App();
+})();

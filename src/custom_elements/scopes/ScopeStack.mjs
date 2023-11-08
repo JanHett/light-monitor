@@ -20,12 +20,6 @@ export class ScopeStack extends HTMLElement {
         if (!videoSourceId) throw TypeError("`video-source` must be specified");
 
         const videoSourceElement = document.getElementById(videoSourceId);
-        if (!(
-            videoSourceElement instanceof HTMLVideoElement
-            || videoSourceElement instanceof HTMLCanvasElement
-        )) {
-            throw TypeError("`video-source` must refer to a <video> or <canvas> element");
-        }
         this.videoSource = new VideoSource(videoSourceElement, "display-p3");
 
         // === The control box ===

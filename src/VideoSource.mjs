@@ -1,9 +1,14 @@
+import { Monitor } from "./custom_elements/Monitor.mjs";
+
 export class VideoSource {
     #sourceElement;
     #hiddenCanvas;
     #eventListeners;
 
     constructor(sourceElement, colorSpace) {
+        if (sourceElement instanceof Monitor) {
+            sourceElement = sourceElement.canvas;
+        }
         if (!(
             sourceElement instanceof HTMLVideoElement
             || sourceElement instanceof HTMLCanvasElement
