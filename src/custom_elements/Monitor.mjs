@@ -1,3 +1,24 @@
+import * as twgl from "../../external/twgl/dist/5.x/twgl-full.module.js"
+import { glsl } from "../util/glsl_util.mjs";
+import { GLSL_COLORSPACE_CONVERSION } from "../util/color_util.mjs";
+import { quadVs, quadPosition } from "../util/glsl_util.mjs";
+import { isLoaded, naturalWidth, naturalHeight, onLoad } from "../util/dom_interface_util.mjs";
+
+const monitorFs = glsl`
+precision mediump float;
+
+${GLSL_COLORSPACE_CONVERSION}
+
+uniform sampler2D source_img;
+uniform vec2 resolution;
+
+void main() {
+    vec2 uv = (gl_FragCoord.xy / resolution); // - vec2(0.5, 0.5);
+
+    gl_FragColor = texture2D(source_img, uv);
+}
+`;
+
 export class Monitor extends HTMLElement {
     static definition = ["bz-monitor", Monitor];
 
@@ -6,27 +27,45 @@ export class Monitor extends HTMLElement {
     /** @type{HTMLVideoElement} */
     #video;
 
+    #programInfo;
+    #bufferInfo;
+
     constructor() {
         super();
     }
 
+    setupShader() {
+        const gl = this.canvas.getContext("webgl", {colorSpace: "display-p3"});
+
+        this.#programInfo = twgl.createProgramInfo(gl,
+            [quadVs, monitorFs]);
+        this.#bufferInfo = twgl.createBufferInfoFromArrays(gl, {
+            position: quadPosition,
+        });
+    }
+
     connectedCallback() {
         const shadow = this.attachShadow({mode: "open"});
-
+        
         // === Internal elements ===
-
+        
         this.#video = document.createElement("video");
-
+        this.#video.playsInline = true;
+        
         // === Build constant GUI ===
-
+        
         this.canvas = document.createElement("canvas");
         this.canvas.id = "display-canvas"
-
+        
         this.colorBars = document.createElement("img");
         this.colorBars.src = "assets/SMPTE_Color_Bars_16x9.png";
-
+        
         this.overlay = document.createElement("div");
         this.overlay.id = "overlay";
+
+        // === Set up WebGL ===
+
+        this.setupShader();
 
         // === Style ===
 
@@ -113,18 +152,21 @@ export class Monitor extends HTMLElement {
             deviceForm.classList.add("placative");
             const deviceSelector = document.createElement("select");
             for (const device of this.#mediaDevices) {
-                if (device.kind === "videoinput" && device.deviceId && device.label) {
+                if (device.kind === "videoinput" && device.deviceId) {
                     const deviceOption = document.createElement("option");
                     deviceOption.value = device.deviceId;
-                    deviceOption.textContent = device.label;
+                    deviceOption.textContent = device.label || device.deviceId;
                     deviceSelector.options.add(deviceOption);
                 }
             }
             deviceSelector.addEventListener("change", ev => {
-                console.log(ev);
-                this.requestCameraImage(deviceSelector.value);
+                if (deviceSelector.value) {
+                    this.requestCameraImage(deviceSelector.value);
+                }
             });
-            this.requestCameraImage(deviceSelector.value);
+            if (deviceSelector.value) {
+                this.requestCameraImage(deviceSelector.value);
+            }
             deviceForm.appendChild(deviceSelector);
             
             const selectCamera = document.createElement("button");
@@ -136,8 +178,42 @@ export class Monitor extends HTMLElement {
         }
     }
 
-    /** @param {HTMLImageElement} image */
+    /** @param {HTMLImageElement | HTMLVideoElement} image */
     displayImage(image) {
+        const gl = this.canvas.getContext("webgl", {colorSpace: "display-p3"});
+        
+        const renderFrame = () => {
+            const width = naturalWidth(image);
+            const height = naturalHeight(image);
+            const ar = `${width / height}`; 
+            this.canvas.style.aspectRatio = ar;
+            gl.useProgram(this.#programInfo.program);
+            twgl.setBuffersAndAttributes(gl, this.#programInfo, this.#bufferInfo);
+            const imgTex = twgl.createTexture(gl, {
+                src: image,
+                auto: false,
+                minMag: gl.LINEAR,
+                wrap: gl.CLAMP_TO_EDGE,
+                flipY: true,
+            });
+            twgl.setUniforms(this.#programInfo, {
+                source_img: imgTex,
+                resolution: [gl.canvas.width, gl.canvas.height],
+            });
+            twgl.drawBufferInfo(gl, this.#bufferInfo);
+
+            if (image instanceof HTMLVideoElement) {
+                requestAnimationFrame(() => renderFrame());
+            };
+        }
+
+        if (isLoaded(image)) requestAnimationFrame(() => renderFrame());
+        else onLoad(image, () => requestAnimationFrame(() => renderFrame()));
+
+    }
+
+    /** @param {HTMLImageElement} image */
+    _displayImage(image) {
         const renderImg = () => {
             const ar = `${image.naturalWidth / image.naturalHeight}`;
             this.canvas.style.aspectRatio = ar;
@@ -152,7 +228,7 @@ export class Monitor extends HTMLElement {
     }
 
     /** @param {HTMLVideoElement} video */
-    displayVideo(video) {
+    _displayVideo(video) {
         const renderFrame = () => {
             const ar = `${video.videoWidth / video.videoHeight}`;
             this.canvas.style.aspectRatio = ar;
@@ -188,9 +264,9 @@ export class Monitor extends HTMLElement {
 
     /** @param {MediaStream} videoStream */
     cameraAvailable(videoStream) {
-        console.log(videoStream);
         this.#video.srcObject = videoStream;
         this.#video.play();
-        this.displayVideo(this.#video);
+        this.displayImage(this.#video);
+        // this.displayVideo(this.#video);
     }
 }

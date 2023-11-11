@@ -1,7 +1,7 @@
 import * as twgl from "../../../external/twgl/dist/5.x/twgl-full.module.js"
 
 import { getPixel, Vec3 } from "../../util/util.mjs"
-import { glsl } from "../../util/glsl_util.mjs";
+import { glsl, quadVs, quadPosition } from "../../util/glsl_util.mjs";
 import { rgbToYCbCr, YCbCrToRGB, GLSL_COLORSPACE_CONVERSION } from "../../util/color_util.mjs";
 import { DRAW_ANTIALIASED, SD_OPS, SD_SHAPES } from "../../util/sdf_util.mjs";
 
@@ -93,7 +93,7 @@ export class Vectorscope extends AbstractScope {
     `;
 
     static backgroundArrays = {
-        position: [-1, -1, 0, 1, -1, 0, -1, 1, 0, -1, 1, 0, 1, -1, 0, 1, 1, 0],
+        position: quadPosition,
     };
 
     constructor(videoSource, markers = [0.75, 1.0]) {
@@ -132,7 +132,7 @@ export class Vectorscope extends AbstractScope {
         if (Vectorscope.RENDERER === "webgl") {
             const gl = this.canvas.getContext("webgl", { colorSpace: "display-p3" });
             this.backgroundProgramInfo = twgl.createProgramInfo(gl,
-                [Vectorscope.background_vs, Vectorscope.background_fs]);
+                [quadVs, Vectorscope.background_fs]);
             this.backgroundBufferInfo = twgl.createBufferInfoFromArrays(gl, Vectorscope.backgroundArrays);
             
             this.distributionProgramInfo = twgl.createProgramInfo(gl,
@@ -170,6 +170,7 @@ export class Vectorscope extends AbstractScope {
 
         gl.useProgram(this.distributionProgramInfo.program);
         // create Float32Array with items containing their indeces
+        // TODO: only recreate this array if the length doesn't match
         const nPixels = imgData.width * imgData.height;
         const pixelIds = new Float32Array(nPixels);
         for (let i = 0; i < nPixels; ++i) pixelIds[i] = i;
