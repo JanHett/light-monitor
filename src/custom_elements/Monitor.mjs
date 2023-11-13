@@ -11,11 +11,25 @@ ${GLSL_COLORSPACE_CONVERSION}
 
 uniform sampler2D source_img;
 uniform vec2 resolution;
+uniform float anamorphic_squeeze;
+uniform float image_ar;
 
 void main() {
-    vec2 uv = (gl_FragCoord.xy / resolution); // - vec2(0.5, 0.5);
+    float frame_ar = resolution.x / resolution.y;
+    vec2 uv = (gl_FragCoord.xy / resolution);
 
-    gl_FragColor = texture2D(source_img, uv);
+    float anamorphic_ar = image_ar * anamorphic_squeeze;
+    float ar_ratio = anamorphic_ar / frame_ar;
+    vec2 img_uv = vec2(
+        uv.x / max(ar_ratio, 1.),
+        uv.y * min(ar_ratio, 1.)
+    );
+    img_uv = vec2(
+        img_uv.x + max(0., (anamorphic_ar - frame_ar) / (2. * anamorphic_squeeze)),
+        img_uv.y + max(0., (1./anamorphic_ar - 1./frame_ar) / 2.)
+    );
+
+    gl_FragColor = texture2D(source_img, img_uv);
 }
 `;
 
@@ -32,6 +46,7 @@ export class Monitor extends HTMLElement {
 
     constructor() {
         super();
+        this.anamorphicSqueeze = 1;
     }
 
     setupShader() {
@@ -56,12 +71,34 @@ export class Monitor extends HTMLElement {
         
         this.canvas = document.createElement("canvas");
         this.canvas.id = "display-canvas"
+        this.canvas.width = window.innerWidth;
         
         this.colorBars = document.createElement("img");
         this.colorBars.src = "assets/SMPTE_Color_Bars_16x9.png";
         
         this.overlay = document.createElement("div");
         this.overlay.id = "overlay";
+
+        const settings = document.createElement("div");
+        // anamorphic squeeze
+        const anamorphicSqueeze = document.createElement("input");
+        anamorphicSqueeze.setAttribute("type", "number");
+        anamorphicSqueeze.setAttribute("step", "0.1");
+        anamorphicSqueeze.value = 1;
+        anamorphicSqueeze.addEventListener("change", () => {
+            this.anamorphicSqueeze = anamorphicSqueeze.value;
+        });
+        settings.appendChild(anamorphicSqueeze);
+        // aspect ratio
+        const aspectRatio = document.createElement("input");
+        aspectRatio.setAttribute("type", "number");
+        aspectRatio.setAttribute("step", "0.1");
+        aspectRatio.addEventListener("change", () => {
+            this.setCanvasAspect(+aspectRatio.value);
+        });
+        aspectRatio.value = 1.75;
+        this.setCanvasAspect(+aspectRatio.value);
+        settings.appendChild(aspectRatio);
 
         // === Set up WebGL ===
 
@@ -79,6 +116,7 @@ export class Monitor extends HTMLElement {
 
         #display-canvas {
             width: 100%;
+            /* object-fit: cover;*/
         }
 
         #overlay.shade {
@@ -105,6 +143,7 @@ export class Monitor extends HTMLElement {
         // === Assembly ===
         
         shadow.appendChild(style);
+        shadow.appendChild(settings);
         shadow.appendChild(this.canvas);
         shadow.appendChild(this.overlay);
 
@@ -178,17 +217,24 @@ export class Monitor extends HTMLElement {
         }
     }
 
+    /** @param {number} aspectRatio */
+    setCanvasAspect(aspectRatio) {
+        this.canvas.style.aspectRatio = aspectRatio;
+        this.canvas.height = this.canvas.width / (+aspectRatio);
+    }
+
     /** @param {HTMLImageElement | HTMLVideoElement} image */
     displayImage(image) {
         const gl = this.canvas.getContext("webgl", {colorSpace: "display-p3"});
         
         const renderFrame = () => {
+            gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
             const width = naturalWidth(image);
             const height = naturalHeight(image);
-            const ar = `${width / height}`; 
-            this.canvas.style.aspectRatio = ar;
+            const image_ar = `${width / height}`;
             gl.useProgram(this.#programInfo.program);
-            twgl.setBuffersAndAttributes(gl, this.#programInfo, this.#bufferInfo);
+            twgl.setBuffersAndAttributes(gl, this.#programInfo,
+                this.#bufferInfo);
             const imgTex = twgl.createTexture(gl, {
                 src: image,
                 auto: false,
@@ -199,6 +245,8 @@ export class Monitor extends HTMLElement {
             twgl.setUniforms(this.#programInfo, {
                 source_img: imgTex,
                 resolution: [gl.canvas.width, gl.canvas.height],
+                anamorphic_squeeze: this.anamorphicSqueeze,
+                image_ar,
             });
             twgl.drawBufferInfo(gl, this.#bufferInfo);
 
@@ -210,37 +258,6 @@ export class Monitor extends HTMLElement {
         if (isLoaded(image)) requestAnimationFrame(() => renderFrame());
         else onLoad(image, () => requestAnimationFrame(() => renderFrame()));
 
-    }
-
-    /** @param {HTMLImageElement} image */
-    _displayImage(image) {
-        const renderImg = () => {
-            const ar = `${image.naturalWidth / image.naturalHeight}`;
-            this.canvas.style.aspectRatio = ar;
-            const ctx = this.canvas.getContext("2d", {colorSpace: "display-p3"});
-            ctx.drawImage(image,
-                0, 0,
-                this.canvas.width, this.canvas.height
-            );
-        }
-        if (image.complete) renderImg();
-        else image.onload = renderImg;
-    }
-
-    /** @param {HTMLVideoElement} video */
-    _displayVideo(video) {
-        const renderFrame = () => {
-            const ar = `${video.videoWidth / video.videoHeight}`;
-            this.canvas.style.aspectRatio = ar;
-            const ctx = this.canvas.getContext("2d", {colorSpace: "display-p3"});
-            ctx.drawImage(video,
-                0, 0,
-                this.canvas.width, this.canvas.height
-            );
-
-            requestAnimationFrame(() => renderFrame());
-        }
-        requestAnimationFrame(() => renderFrame());
     }
 
     /** @param {Array<MediaDeviceInfo>} mediaDevices */
@@ -267,6 +284,5 @@ export class Monitor extends HTMLElement {
         this.#video.srcObject = videoStream;
         this.#video.play();
         this.displayImage(this.#video);
-        // this.displayVideo(this.#video);
     }
 }
