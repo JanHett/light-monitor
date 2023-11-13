@@ -50,4 +50,26 @@ vec3 rgbToYCbCr(in vec3 rgb) {
 vec3 YCbCrToRGB(in vec3 YCbCr) {
     return YCbCr * YCbCrToRGBMat;
 }
+
+float applysRGBTransferFunc(in float linear_sRGB) {
+    if (linear_sRGB <= 0.0031308) {
+        return 12.92 * linear_sRGB;
+    }
+    return 1.055 * pow(linear_sRGB, 1./2.4) - 0.055;
+}
+
+mat3 XYZTosRGBMat = mat3(
+    +3.2404542, -1.5371385, -0.4985314,
+    -0.9692660, +1.8760108, +0.0415560,
+    +0.0556434, -0.2040259, +1.0572252
+);
+
+vec3 XYZTosRGB(in vec3 XYZ) {
+    vec3 v = XYZ * XYZTosRGBMat;
+    return vec3(
+        applysRGBTransferFunc(v.r),
+        applysRGBTransferFunc(v.g),
+        applysRGBTransferFunc(v.b)
+    );
+}
 `;

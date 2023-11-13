@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "rollup --config && cp src/index.html dist && cp src/style.css dist"
+    "build": "rollup --config && ./build.sh"
   },
   "keywords": [],
   "author": "Jan Hettenkofer",
