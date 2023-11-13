@@ -8,7 +8,7 @@ class AbstractWaveformScope extends AbstractScope {
         this.guidelines = guidelines;
     }
 
-    drawScope(imgData) {
+    drawScope() {
         this.canvas.width = this.clientWidth;
         this.canvas.height = this.clientHeight;
 

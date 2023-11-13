@@ -140,12 +140,7 @@ export class Vectorscope extends AbstractScope {
         }
     }
 
-    drawScope(imgData) {
-        if (Vectorscope.RENDERER === "webgl") return this.drawScopeGL(imgData);
-        else return this.drawScope2d(imgData);
-    }
-
-    drawScopeGL(imgData) {
+    drawScope() {
         this.canvas.width = this.clientWidth;
         this.canvas.height = this.clientHeight;
 
@@ -155,10 +150,12 @@ export class Vectorscope extends AbstractScope {
 
         // --- draw the background ---
 
+        const sourceImg = this.videoSource.textureSource;
+
         gl.useProgram(this.backgroundProgramInfo.program);
         twgl.setBuffersAndAttributes(gl, this.backgroundProgramInfo, this.backgroundBufferInfo);
         const imgTex = twgl.createTexture(gl, {
-            src: imgData // TODO: get iamge data directly off the video
+            src: sourceImg
         });
         twgl.setUniforms(this.backgroundProgramInfo, {
             source_img: imgTex,
@@ -171,7 +168,7 @@ export class Vectorscope extends AbstractScope {
         gl.useProgram(this.distributionProgramInfo.program);
         // create Float32Array with items containing their indeces
         // TODO: only recreate this array if the length doesn't match
-        const nPixels = imgData.width * imgData.height;
+        const nPixels = sourceImg.width * sourceImg.height;
         const pixelIds = new Float32Array(nPixels);
         for (let i = 0; i < nPixels; ++i) pixelIds[i] = i;
         const pixelIdBufferInfo = twgl.createBufferInfoFromArrays(gl, {
@@ -181,80 +178,9 @@ export class Vectorscope extends AbstractScope {
         twgl.setBuffersAndAttributes(gl, this.distributionProgramInfo, pixelIdBufferInfo);
         twgl.setUniforms(this.distributionProgramInfo, {
             source_img: imgTex,
-            resolution: [imgData.width, imgData.height],
+            resolution: [sourceImg.width, sourceImg.height],
         });
 
         twgl.drawBufferInfo(gl, pixelIdBufferInfo);
-    }
-    
-    drawScope2d(imgData) {
-        this.canvas.width = this.clientWidth;
-        this.canvas.height = this.clientHeight;
-
-        const ctx = this.canvas.getContext("2d", { colorSpace: "display-p3" });
-        
-        ctx.fillStyle = "#000"
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-        // === colour in the background ===
-        for (let scaleCr = 0; scaleCr < this.canvas.height; ++scaleCr) {
-            const Cr = (scaleCr / this.canvas.height - 0.5) * 255;
-            for (let scaleCb = 0; scaleCb < this.canvas.width; ++scaleCb) {
-                const Cb = (scaleCb / this.canvas.width - 0.5) * 255;
-
-                const [r, g, b] = YCbCrToRGB(Vec3.fromValues(128, Cb, Cr)).elements;
-
-                ctx.fillStyle = `rgb(${r}, ${g}, ${b})`
-                ctx.fillRect(scaleCb, scaleCr, 1, 1);
-            }
-        }
-
-        const centerX = this.canvas.width / 2;
-        const centerY = this.canvas.height / 2;
-
-        // === draw R/G/B and C/M/Y saturation markers
-        ctx.fillStyle = "rgb(64, 64, 64)";
-        const markerSize = 11;
-        for (const axis of [
-            Vec3.fromValues(255, 0, 0),
-            Vec3.fromValues(0, 255, 0),
-            Vec3.fromValues(0, 0, 255),
-            Vec3.fromValues(255, 255, 0),
-            Vec3.fromValues(0, 255, 255),
-            Vec3.fromValues(255, 0, 255),
-        ]) {
-            for (const marker of this.markers) {
-                const YCbCr = rgbToYCbCr(axis).mul(marker);
-                const [Y, Cb, Cr] = YCbCr.elements;
-
-                ctx.fillRect(
-                    Math.floor(Cb / 255 * this.canvas.width) + centerX - Math.floor(markerSize / 2),
-                    Math.floor(Cr / 255 * this.canvas.height) + centerY - 1,
-                    markerSize, 3
-                );
-                ctx.fillRect(
-                    Math.floor(Cb / 255 * this.canvas.width) + centerX - 1,
-                    Math.floor(Cr / 255 * this.canvas.height) + centerY - Math.floor(markerSize / 2),
-                    3, markerSize
-                );
-            }
-        }
-
-        // === draw the sample dots ===
-        ctx.fillStyle = "rgba(255,255,255, 0.1)";
-        const stride = Math.ceil(imgData.width / 360);
-        for (let y = 0; y < imgData.height; y += stride) {
-            for (let x = 0; x < imgData.width; x += stride) {
-                const [r, g, b] = getPixel(imgData, x, y);
-
-                const [Y, Cb, Cr] = rgbToYCbCr(Vec3.fromValues(r, g, b)).elements;
-
-                ctx.fillRect(
-                    Cb / 255 * this.canvas.width + centerX,
-                    Cr / 255 * this.canvas.height + centerY,
-                    1, 1
-                );
-            }
-        }
     }
 }

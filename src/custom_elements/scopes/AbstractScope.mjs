@@ -1,14 +1,20 @@
+import { VideoSource } from "../../VideoSource.mjs";
+
 export class AbstractScope extends HTMLElement {
+    /** @param {VideoSource} videoSource */
     constructor(videoSource) {
         super();
         this.videoSource = videoSource;
+        this._keepDrawing = true;
 
-        this.frameListener = this.videoSource.addEventListener("frame", (event, imgData) => {
-            this.drawScope(imgData)
-        });
+        const animationCb = () => {
+            this.drawScope();
+            if (this._keepDrawing) requestAnimationFrame(animationCb);
+        };
+        requestAnimationFrame(animationCb);
     }
 
     disconnectedCallback() {
-        this.videoSource.removeEventListener("frame", this.frameListener);
+        this._keepDrawing = false;
     }
 }
