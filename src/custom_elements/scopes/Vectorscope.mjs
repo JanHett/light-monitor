@@ -1,100 +1,83 @@
 import * as twgl from "../../../external/twgl/dist/5.x/twgl-full.module.js"
-
-import { getPixel, Vec3 } from "../../util/util.mjs"
 import { glsl, quadVs, quadPosition } from "../../util/glsl_util.mjs";
-import { rgbToYCbCr, YCbCrToRGB, GLSL_COLORSPACE_CONVERSION } from "../../util/color_util.mjs";
+import { GLSL_COLORSPACE_CONVERSION } from "../../util/color_util.mjs";
 import { DRAW_ANTIALIASED, SD_OPS, SD_SHAPES } from "../../util/sdf_util.mjs";
 
-import { AbstractScope } from "./AbstractScope.mjs";
+import { AbstractWebGLScope } from "./AbstractScope.mjs";
 
-export class Vectorscope extends AbstractScope {
+const distribution_vs = glsl`
+${GLSL_COLORSPACE_CONVERSION}
+
+// -------------------------------------------------------------------------
+
+attribute float pixelId;
+uniform sampler2D source_img;
+uniform vec2 resolution;
+
+void main() {
+    vec2 pixel = vec2(mod(pixelId, resolution.x), floor(pixelId / resolution.x));
+    vec2 uv = (pixel / resolution);
+
+    vec4 pixel_rgb = texture2D(source_img, uv);
+    vec2 pixel_CbCr = rgbToYCbCr(pixel_rgb.rgb).yz * 2.;
+
+    gl_Position = vec4(pixel_CbCr, 0., 1.);
+}
+`;
+const distribution_fs = glsl`
+precision mediump float;
+void main() {
+    gl_FragColor = vec4(vec3(1.), 0.1);
+}
+`;
+
+const background_fs = glsl`
+precision mediump float;
+
+${SD_OPS}
+${SD_SHAPES}
+${DRAW_ANTIALIASED}
+${GLSL_COLORSPACE_CONVERSION}
+
+uniform sampler2D source_img;
+uniform vec2 resolution;
+
+void main() {
+    vec2 CbCr = (gl_FragCoord.xy / resolution) - vec2(0.5, 0.5);
+    //gl_FragColor = texture2D(source_img, CbCr);
+
+    vec3 col = YCbCrToRGB(vec3(0.5, CbCr));
+    
+    // markers
+    vec2 safe_r = rgbToYCbCr(vec3(0.75, 0, 0)).yz;
+    vec2 safe_g = rgbToYCbCr(vec3(0, 0.75, 0)).yz;
+    vec2 safe_b = rgbToYCbCr(vec3(0, 0, 0.75)).yz;
+    vec2 safe_c = rgbToYCbCr(vec3(0, 0.75, 0.75)).yz;
+    vec2 safe_m = rgbToYCbCr(vec3(0.75, 0, 0.75)).yz;
+    vec2 safe_y = rgbToYCbCr(vec3(0.75, 0.75, 0)).yz;
+
+    float aa_smoothing = 1.5 / resolution.x;
+    col = draw_aa(vec3(1.), col, aa_smoothing,
+        opOnion(sdCircle(CbCr - safe_r, 0.02), 0.002));
+    col = draw_aa(vec3(1.), col, aa_smoothing,
+        opOnion(sdCircle(CbCr - safe_g, 0.02), 0.002));
+    col = draw_aa(vec3(1.), col, aa_smoothing,
+        opOnion(sdCircle(CbCr - safe_b, 0.02), 0.002));
+    col = draw_aa(vec3(1.), col, aa_smoothing,
+        opOnion(sdCircle(CbCr - safe_c, 0.02), 0.0002));
+    col = draw_aa(vec3(1.), col, aa_smoothing,
+        opOnion(sdCircle(CbCr - safe_m, 0.02), 0.0002));
+    col = draw_aa(vec3(1.), col, aa_smoothing,
+        opOnion(sdCircle(CbCr - safe_y, 0.02), 0.0002));
+
+    gl_FragColor = vec4(col, 1.);
+}
+`;
+
+export class Vectorscope extends AbstractWebGLScope {
     static definition = ["bz-vectorscope", Vectorscope];
     static scopeId = "vectorscope"
     static scopeName = "Vectorscope"
-
-    static RENDERER = "webgl"
-    // static RENDERER = "2d"
-
-    static distribution_vs = glsl`
-    ${GLSL_COLORSPACE_CONVERSION}
-
-    // -------------------------------------------------------------------------
-
-    attribute float pixelId;
-    uniform sampler2D source_img;
-    uniform vec2 resolution;
-
-    void main() {
-        vec2 pixel = vec2(mod(pixelId, resolution.x), floor(pixelId / resolution.x));
-        vec2 uv = (pixel / resolution);
-
-        vec4 pixel_rgb = texture2D(source_img, uv);
-        vec2 pixel_CbCr = rgbToYCbCr(pixel_rgb.rgb).yz * 2.;
-
-        gl_Position = vec4(pixel_CbCr, 0., 1.);
-    }
-    `;
-    static distribution_fs = glsl`
-    precision mediump float;
-    void main() {
-        gl_FragColor = vec4(1.);
-    }
-    `;
-
-    static background_vs = glsl`
-    attribute vec4 position;
-
-    void main() {
-        gl_Position = position;
-    }
-    `;
-
-    static background_fs = glsl`
-    precision mediump float;
-
-    ${SD_OPS}
-    ${SD_SHAPES}
-    ${DRAW_ANTIALIASED}
-    ${GLSL_COLORSPACE_CONVERSION}
-
-    uniform sampler2D source_img;
-    uniform vec2 resolution;
-
-    void main() {
-        vec2 CbCr = (gl_FragCoord.xy / resolution) - vec2(0.5, 0.5);
-        //gl_FragColor = texture2D(source_img, CbCr);
-
-        vec3 col = YCbCrToRGB(vec3(0.5, CbCr));
-        
-        // markers
-        vec2 safe_r = rgbToYCbCr(vec3(0.75, 0, 0)).yz;
-        vec2 safe_g = rgbToYCbCr(vec3(0, 0.75, 0)).yz;
-        vec2 safe_b = rgbToYCbCr(vec3(0, 0, 0.75)).yz;
-        vec2 safe_c = rgbToYCbCr(vec3(0, 0.75, 0.75)).yz;
-        vec2 safe_m = rgbToYCbCr(vec3(0.75, 0, 0.75)).yz;
-        vec2 safe_y = rgbToYCbCr(vec3(0.75, 0.75, 0)).yz;
-
-        float aa_smoothing = 1.5 / resolution.x;
-        col = draw_aa(vec3(1.), col, aa_smoothing,
-            opOnion(sdCircle(CbCr - safe_r, 0.02), 0.002));
-        col = draw_aa(vec3(1.), col, aa_smoothing,
-            opOnion(sdCircle(CbCr - safe_g, 0.02), 0.002));
-        col = draw_aa(vec3(1.), col, aa_smoothing,
-            opOnion(sdCircle(CbCr - safe_b, 0.02), 0.002));
-        col = draw_aa(vec3(1.), col, aa_smoothing,
-            opOnion(sdCircle(CbCr - safe_c, 0.02), 0.0002));
-        col = draw_aa(vec3(1.), col, aa_smoothing,
-            opOnion(sdCircle(CbCr - safe_m, 0.02), 0.0002));
-        col = draw_aa(vec3(1.), col, aa_smoothing,
-            opOnion(sdCircle(CbCr - safe_y, 0.02), 0.0002));
-
-        gl_FragColor = vec4(col, 1.);
-    }
-    `;
-
-    static backgroundArrays = {
-        position: quadPosition,
-    };
 
     constructor(videoSource, markers = [0.75, 1.0]) {
         super(videoSource);
@@ -129,15 +112,19 @@ export class Vectorscope extends AbstractScope {
         this.canvas.width = this.clientWidth;
         this.canvas.height = this.clientHeight;
 
-        if (Vectorscope.RENDERER === "webgl") {
-            const gl = this.canvas.getContext("webgl", { colorSpace: "display-p3" });
-            this.backgroundProgramInfo = twgl.createProgramInfo(gl,
-                [quadVs, Vectorscope.background_fs]);
-            this.backgroundBufferInfo = twgl.createBufferInfoFromArrays(gl, Vectorscope.backgroundArrays);
-            
-            this.distributionProgramInfo = twgl.createProgramInfo(gl,
-                [Vectorscope.distribution_vs, Vectorscope.distribution_fs]);
-        }
+        const gl = this.canvas.getContext("webgl", { colorSpace: "display-p3" });
+        this.backgroundProgramInfo = twgl.createProgramInfo(gl,
+            [quadVs, background_fs]);
+        this.backgroundBufferInfo = twgl.createBufferInfoFromArrays(gl, {
+            position: quadPosition,
+        });
+        
+        this.distributionProgramInfo = twgl.createProgramInfo(gl,
+            [distribution_vs, distribution_fs]);
+
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.ONE, gl.ONE);
     }
 
     drawScope() {
@@ -166,21 +153,15 @@ export class Vectorscope extends AbstractScope {
         // --- draw the vectorscope distribution ---
 
         gl.useProgram(this.distributionProgramInfo.program);
-        // create Float32Array with items containing their indeces
-        // TODO: only recreate this array if the length doesn't match
-        const nPixels = sourceImg.width * sourceImg.height;
-        const pixelIds = new Float32Array(nPixels);
-        for (let i = 0; i < nPixels; ++i) pixelIds[i] = i;
-        const pixelIdBufferInfo = twgl.createBufferInfoFromArrays(gl, {
-            pixelId: { size: 1, data: pixelIds },
-        });
+        this._ensurePixelIdBuf(gl, sourceImg);
 
-        twgl.setBuffersAndAttributes(gl, this.distributionProgramInfo, pixelIdBufferInfo);
+        twgl.setBuffersAndAttributes(gl, this.distributionProgramInfo,
+            this._pixelIdBufferInfo.buffers);
         twgl.setUniforms(this.distributionProgramInfo, {
             source_img: imgTex,
             resolution: [sourceImg.width, sourceImg.height],
         });
 
-        twgl.drawBufferInfo(gl, pixelIdBufferInfo);
+        twgl.drawBufferInfo(gl, this._pixelIdBufferInfo.buffers, gl.POINTS);
     }
 }
