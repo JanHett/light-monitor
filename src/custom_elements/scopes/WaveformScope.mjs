@@ -1,8 +1,77 @@
-import { getPixel } from "../../util/util.mjs"
+import * as twgl from "../../../external/twgl/dist/5.x/twgl-full.module.js"
+import { glsl, quadVs, quadPosition } from "../../util/glsl_util.mjs";
+import { GLSL_COLORSPACE_CONVERSION } from "../../util/color_util.mjs";
+import { DRAW_ANTIALIASED, SD_OPS, SD_SHAPES } from "../../util/sdf_util.mjs";
 
-import { AbstractScope } from "./AbstractScope.mjs";
+import { AbstractWebGLScope } from "./AbstractScope.mjs";
 
-class AbstractWaveformScope extends AbstractScope {
+const distribution_vs = glsl`
+${GLSL_COLORSPACE_CONVERSION}
+
+// -------------------------------------------------------------------------
+
+attribute float pixelId;
+uniform sampler2D source_img;
+uniform vec2 resolution;
+uniform int color_idx;
+
+float getVectorComponent(vec4 vec, int idx) {
+    if (idx == 0) return vec.x;
+    if (idx == 1) return vec.y;
+    if (idx == 2) return vec.z;
+    return vec.w;
+}
+
+float getColorComponent(vec4 vec, int idx) {
+    if (idx < 0) return (vec.r + vec.g + vec.b) / 3.;
+    return getVectorComponent(vec, idx);
+}
+
+void main() {
+    vec2 pixel = vec2(
+        mod(pixelId, resolution.x),
+        floor(pixelId / resolution.x)
+    );
+    vec2 uv = (pixel / resolution);
+
+    vec4 pixel_rgb = texture2D(source_img, uv);
+
+    gl_Position = vec4(vec2(
+        uv.x * 2. - 1.,
+        getColorComponent(pixel_rgb, color_idx) * 2. - 1.
+    ), 0., 1.);
+}
+`;
+
+const distribution_fs = glsl`
+precision mediump float;
+
+uniform vec3 color;
+
+void main() {
+    gl_FragColor = vec4(color, 0.1);
+}
+`;
+
+const background_fs = glsl`
+precision mediump float;
+
+${SD_OPS}
+${SD_SHAPES}
+${DRAW_ANTIALIASED}
+${GLSL_COLORSPACE_CONVERSION}
+
+uniform sampler2D source_img;
+uniform vec2 resolution;
+
+void main() {
+    vec2 uv = (gl_FragCoord.xy / resolution);
+
+    gl_FragColor = vec4(vec3(0.), 1.);
+}
+`;
+
+class AbstractWaveformScope extends AbstractWebGLScope {
     constructor(videoSource, guidelines = [0.1, 0.8]) {
         super(videoSource);
         this.guidelines = guidelines;
@@ -12,24 +81,32 @@ class AbstractWaveformScope extends AbstractScope {
         this.canvas.width = this.clientWidth;
         this.canvas.height = this.clientHeight;
 
-        const ctx = this.canvas.getContext("2d", { colorSpace: "display-p3" });
-        
-        ctx.fillStyle = "#000"
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        for (let x = 0; x < this.canvas.width; ++x) {
-            const relativeX = x / this.canvas.width
-            const imgX = Math.round(relativeX * imgData.width);
-            for (let y = 0; y < imgData.height; ++y) {
-                const [r, g, b] = getPixel(imgData, imgX, y);
-                this.drawWaveformDot(x, r, g, b, ctx);
-            }
-        }
+        const gl = this.canvas.getContext("webgl", { colorSpace: "display-p3" });
+        gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
-        ctx.fillStyle = "#fffc";
-        for (const guideline of this.guidelines) {
-            ctx.fillRect(0, (1 - guideline) * this.canvas.height, this.canvas.width, 1);
-        }
+        // --- draw the background ---
+
+        const sourceImg = this.videoSource.textureSource;
+
+        gl.useProgram(this.backgroundProgramInfo.program);
+        twgl.setBuffersAndAttributes(gl, this.backgroundProgramInfo, this.backgroundBufferInfo);
+        const imgTex = twgl.createTexture(gl, {
+            src: sourceImg
+        });
+        twgl.setUniforms(this.backgroundProgramInfo, {
+            source_img: imgTex,
+            resolution: [gl.canvas.width, gl.canvas.height],
+        });
+        twgl.drawBufferInfo(gl, this.backgroundBufferInfo);
+
+        // --- draw the vectorscope distribution ---
+
+        this._ensurePixelIdBuf(gl, sourceImg);
+        this.drawDistribution(gl, {
+            source_img: imgTex,
+            resolution: [sourceImg.width, sourceImg.height],
+        });
+
     }
 
     connectedCallback() {
@@ -57,8 +134,19 @@ class AbstractWaveformScope extends AbstractScope {
         shadow.appendChild(this.canvas);
         shadow.appendChild(style);
 
-        this.canvas.width = this.clientWidth;
-        this.canvas.height = this.clientHeight;
+        const gl = this.canvas.getContext("webgl", { colorSpace: "display-p3" });
+        this.backgroundProgramInfo = twgl.createProgramInfo(gl,
+            [quadVs, background_fs]);
+        this.backgroundBufferInfo = twgl.createBufferInfoFromArrays(gl, {
+            position: quadPosition
+        });
+        
+        this.distributionProgramInfo = twgl.createProgramInfo(gl,
+            [distribution_vs, distribution_fs]);
+
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.ONE, gl.ONE);
     }
 }
 
@@ -67,14 +155,24 @@ export class RGBWaveformScope extends AbstractWaveformScope {
     static scopeId = "rgb-waveform"
     static scopeName = "RGB Waveform"
 
-    drawWaveformDot(x, r, g, b, waveformCtx) {
-        const height = this.canvas.height;
-        waveformCtx.fillStyle = "rgba(255, 0, 0, 0.1)";
-        waveformCtx.fillRect(x, height - r / 255 * height, 1, 1);
-        waveformCtx.fillStyle = "rgba(0, 255, 0, 0.1)";
-        waveformCtx.fillRect(x, height - g / 255 * height, 1, 1);
-        waveformCtx.fillStyle = "rgba(0, 0, 255, 0.1)";
-        waveformCtx.fillRect(x, height - b / 255 * height, 1, 1);
+    drawDistribution(gl, imgUniforms) {
+        gl.useProgram(this.distributionProgramInfo.program);
+
+        twgl.setBuffersAndAttributes(gl, this.distributionProgramInfo,
+            this._pixelIdBufferInfo.buffers);
+        
+        for (const [color_idx, color] of [
+            [1, 0, 0],
+            [0, 1, 0],
+            [0, 0, 1]
+        ].entries()) {
+            twgl.setUniforms(this.distributionProgramInfo, {
+                ...imgUniforms,
+                color,
+                color_idx
+            });
+            twgl.drawBufferInfo(gl, this._pixelIdBufferInfo.buffers, gl.POINTS);
+        }
     }
 }
 
@@ -83,11 +181,17 @@ export class LumaWaveformScope extends AbstractWaveformScope {
     static scopeId = "luma-waveform"
     static scopeName = "Luma Waveform"
 
-    drawWaveformDot(x, r, g, b, waveformCtx) {
-        const height = this.canvas.height;
-        const luma = (r + g + b) / 3 / 255;
-        waveformCtx.fillStyle = "rgba(255,255,255, 0.1)";
-        waveformCtx.fillRect(x, height - luma * height, 1, 1);
-    
+    drawDistribution(gl, imgUniforms) {
+        gl.useProgram(this.distributionProgramInfo.program);
+
+        twgl.setBuffersAndAttributes(gl, this.distributionProgramInfo,
+            this._pixelIdBufferInfo.buffers);
+        
+        twgl.setUniforms(this.distributionProgramInfo, {
+            ...imgUniforms,
+            color: [1,1,1],
+            color_idx: -1
+        });
+        twgl.drawBufferInfo(gl, this._pixelIdBufferInfo.buffers, gl.POINTS);
     }
 }
