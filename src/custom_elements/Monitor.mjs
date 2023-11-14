@@ -227,6 +227,15 @@ export class Monitor extends HTMLElement {
     displayImage(image) {
         const gl = this.canvas.getContext("webgl", {colorSpace: "display-p3"});
         
+        const texOpts = {
+            src: image,
+            auto: false,
+            minMag: gl.LINEAR,
+            wrap: gl.CLAMP_TO_EDGE,
+            flipY: true,
+        };
+        const imgTex = twgl.createTexture(gl, texOpts);
+
         const renderFrame = () => {
             gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
             const width = naturalWidth(image);
@@ -235,13 +244,7 @@ export class Monitor extends HTMLElement {
             gl.useProgram(this.#programInfo.program);
             twgl.setBuffersAndAttributes(gl, this.#programInfo,
                 this.#bufferInfo);
-            const imgTex = twgl.createTexture(gl, {
-                src: image,
-                auto: false,
-                minMag: gl.LINEAR,
-                wrap: gl.CLAMP_TO_EDGE,
-                flipY: true,
-            });
+            twgl.setTextureFromElement(gl, imgTex, image, texOpts)
             twgl.setUniforms(this.#programInfo, {
                 source_img: imgTex,
                 resolution: [gl.canvas.width, gl.canvas.height],
@@ -251,12 +254,12 @@ export class Monitor extends HTMLElement {
             twgl.drawBufferInfo(gl, this.#bufferInfo);
 
             if (image instanceof HTMLVideoElement) {
-                requestAnimationFrame(() => renderFrame());
+                requestAnimationFrame(renderFrame);
             };
         }
 
-        if (isLoaded(image)) requestAnimationFrame(() => renderFrame());
-        else onLoad(image, () => requestAnimationFrame(() => renderFrame()));
+        if (isLoaded(image)) requestAnimationFrame(renderFrame);
+        else onLoad(image, () => requestAnimationFrame(renderFrame));
 
     }
 
