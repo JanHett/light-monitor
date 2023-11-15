@@ -32,6 +32,9 @@ export class ColorMatchingFunction {
     wavelength_increment() { return this.#increment; }
 }
 
+/**
+ * CIE 2018, CIE 1931 colour-matching functions , 2 degree observer (data table), International Commission on Illumination (CIE), Vienna, Austria, DOI:10.25039/CIE.DS.xvudnb9b
+ */
 export const CIE_xyz_1931_2deg = new ColorMatchingFunction(360, 830, 1, [
     [0.000129900000,0.0000039170000,0.000606100000],
     [0.000145847000,0.0000043935810,0.000680879200],

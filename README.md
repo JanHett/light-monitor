@@ -1,4 +1,4 @@
-# An minimal field monitor
+# Touchstone: a minimal field monitor
 
 ## Credits
 
