@@ -1,15 +1,11 @@
 import * as twgl from "../../../external/twgl/dist/5.x/twgl-full.module.js"
-import { glsl, quadVs, quadPosition } from "../../util/glsl_util.mjs";
+import { glsl, quadVs, quadPosition, identityVs } from "../../util/glsl_util.mjs";
 import { GLSL_COLORSPACE_CONVERSION } from "../../util/color_util.mjs";
 import { DRAW_ANTIALIASED, SD_OPS, SD_SHAPES } from "../../util/sdf_util.mjs";
 
 import { AbstractWebGLScope } from "./AbstractScope.mjs";
 
 const distribution_vs = glsl`
-${GLSL_COLORSPACE_CONVERSION}
-
-// -------------------------------------------------------------------------
-
 attribute float pixelId;
 uniform sampler2D source_img;
 uniform vec2 resolution;
@@ -43,36 +39,25 @@ void main() {
 }
 `;
 
-const distribution_fs = glsl`
+const tint_fs = opacity => glsl`
 precision mediump float;
-
 uniform vec3 color;
-
 void main() {
-    gl_FragColor = vec4(color, 0.1);
+    gl_FragColor = vec4(color, ${opacity});
 }
 `;
 
+const distribution_fs = tint_fs(0.1);
+const guideline_fs = tint_fs(1);
+
 const background_fs = glsl`
-precision mediump float;
-
-${SD_OPS}
-${SD_SHAPES}
-${DRAW_ANTIALIASED}
-${GLSL_COLORSPACE_CONVERSION}
-
-uniform sampler2D source_img;
-uniform vec2 resolution;
-
 void main() {
-    vec2 uv = (gl_FragCoord.xy / resolution);
-
     gl_FragColor = vec4(vec3(0.), 1.);
 }
 `;
 
 class AbstractWaveformScope extends AbstractWebGLScope {
-    constructor(videoSource, guidelines = [0.1, 0.8]) {
+    constructor(videoSource, guidelines = [0.1, 0.5, 0.8]) {
         super(videoSource);
         this.guidelines = guidelines;
     }
@@ -100,6 +85,7 @@ class AbstractWaveformScope extends AbstractWebGLScope {
         twgl.drawBufferInfo(gl, this.backgroundBufferInfo);
 
         // --- draw the vectorscope distribution ---
+        gl.enable(gl.BLEND);
 
         this._ensurePixelIdBuf(gl, sourceImg);
         this.drawDistribution(gl, {
@@ -107,6 +93,15 @@ class AbstractWaveformScope extends AbstractWebGLScope {
             resolution: [sourceImg.width, sourceImg.height],
         });
 
+        // --- draw the guidelines ---
+        gl.disable(gl.BLEND);
+
+        gl.useProgram(this.guidelineProgramInfo.program);
+        twgl.setBuffersAndAttributes(gl, this.guidelineProgramInfo, this.guidelineBufferInfo);
+        twgl.setUniforms(this.guidelineProgramInfo, {
+            color: [1,1,1]
+        })
+        twgl.drawBufferInfo(gl, this.guidelineBufferInfo, gl.LINES);
     }
 
     connectedCallback() {
@@ -135,14 +130,40 @@ class AbstractWaveformScope extends AbstractWebGLScope {
         shadow.appendChild(style);
 
         const gl = this.canvas.getContext("webgl", { colorSpace: "display-p3" });
+
+        // --- build background program ---
+
         this.backgroundProgramInfo = twgl.createProgramInfo(gl,
             [quadVs, background_fs]);
         this.backgroundBufferInfo = twgl.createBufferInfoFromArrays(gl, {
             position: quadPosition
         });
         
+        // --- build distribution program ---
+
         this.distributionProgramInfo = twgl.createProgramInfo(gl,
             [distribution_vs, distribution_fs]);
+
+        // --- build guideline program ---
+
+        this.guidelineProgramInfo = twgl.createProgramInfo(gl,
+            [identityVs, guideline_fs]);
+
+        const guideVertices = [];
+        for (const guide of this.guidelines) {
+            const guideY = guide * 2 - 1;
+            guideVertices.push(
+                1.1, guideY, 0, 1,
+                -1, guideY, 0, 1,
+                1.1, guideY, 0, 1,
+            );
+        }
+
+        this.guidelineBufferInfo = twgl.createBufferInfoFromArrays(gl, {
+            position: { numComponents: 4, data: guideVertices}
+        });
+
+        // --- set rendering flags ---
 
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         gl.enable(gl.BLEND);

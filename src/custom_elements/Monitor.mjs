@@ -82,15 +82,22 @@ export class Monitor extends HTMLElement {
         const settings = document.createElement("div");
         // anamorphic squeeze
         const anamorphicSqueeze = document.createElement("input");
+        anamorphicSqueeze.id = "anamorphic-squeeze";
+        const anamorphicSqueezeLabel = document.createElement("label");
+        anamorphicSqueezeLabel.setAttribute("for", "anamorphic-squeeze");
         anamorphicSqueeze.setAttribute("type", "number");
         anamorphicSqueeze.setAttribute("step", "0.1");
         anamorphicSqueeze.value = 1;
         anamorphicSqueeze.addEventListener("change", () => {
             this.anamorphicSqueeze = anamorphicSqueeze.value;
         });
+        settings.appendChild(anamorphicSqueezeLabel);
         settings.appendChild(anamorphicSqueeze);
         // aspect ratio
         const aspectRatio = document.createElement("input");
+        aspectRatio.id = "aspect-ratio";
+        const aspectRatioLabel = document.createElement("label");
+        aspectRatioLabel.setAttribute("for", "aspect-ratio");
         aspectRatio.setAttribute("type", "number");
         aspectRatio.setAttribute("step", "0.1");
         aspectRatio.addEventListener("change", () => {
@@ -98,6 +105,7 @@ export class Monitor extends HTMLElement {
         });
         aspectRatio.value = 1.75;
         this.setCanvasAspect(+aspectRatio.value);
+        settings.appendChild(aspectRatioLabel);
         settings.appendChild(aspectRatio);
 
         // === Set up WebGL ===
@@ -265,7 +273,6 @@ export class Monitor extends HTMLElement {
 
     /** @param {Array<MediaDeviceInfo>} mediaDevices */
     updateDevices(mediaDevices) {
-        console.log(mediaDevices);
         this.#mediaDevices = mediaDevices;
     }
 
