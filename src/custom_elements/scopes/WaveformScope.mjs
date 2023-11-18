@@ -1,7 +1,5 @@
 import * as twgl from "../../../external/twgl/dist/5.x/twgl-full.module.js"
 import { glsl, quadVs, quadPosition, identityVs } from "../../util/glsl_util.mjs";
-import { GLSL_COLORSPACE_CONVERSION } from "../../util/color_util.mjs";
-import { DRAW_ANTIALIASED, SD_OPS, SD_SHAPES } from "../../util/sdf_util.mjs";
 
 import { AbstractWebGLScope } from "./AbstractScope.mjs";
 
@@ -75,11 +73,9 @@ class AbstractWaveformScope extends AbstractWebGLScope {
 
         gl.useProgram(this.backgroundProgramInfo.program);
         twgl.setBuffersAndAttributes(gl, this.backgroundProgramInfo, this.backgroundBufferInfo);
-        const imgTex = twgl.createTexture(gl, {
-            src: sourceImg
-        });
+        twgl.setTextureFromElement(gl, this._imgTex, sourceImg, this._texOpts)
         twgl.setUniforms(this.backgroundProgramInfo, {
-            source_img: imgTex,
+            source_img: this._imgTex,
             resolution: [gl.canvas.width, gl.canvas.height],
         });
         twgl.drawBufferInfo(gl, this.backgroundBufferInfo);
@@ -89,7 +85,7 @@ class AbstractWaveformScope extends AbstractWebGLScope {
 
         this._ensurePixelIdBuf(gl, sourceImg);
         this.drawDistribution(gl, {
-            source_img: imgTex,
+            source_img: this._imgTex,
             resolution: [sourceImg.width, sourceImg.height],
         });
 
@@ -168,6 +164,15 @@ class AbstractWaveformScope extends AbstractWebGLScope {
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.ONE, gl.ONE);
+
+        const sourceImg = this.videoSource.textureSource;
+        this._texOpts = {
+            src: sourceImg,
+            auto: false,
+            minMag: gl.LINEAR,
+            wrap: gl.CLAMP_TO_EDGE,
+        };
+        this._imgTex = twgl.createTexture(gl, this._texOpts);
     }
 }
 

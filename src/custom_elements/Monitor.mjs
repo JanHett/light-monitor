@@ -195,17 +195,24 @@ export class Monitor extends HTMLElement {
             prompt.classList.add("placative");
             this.overlay.appendChild(prompt);
 
-            const deviceForm = document.createElement("form");
+            const deviceForm = document.createElement("div");
             deviceForm.classList.add("placative");
             const deviceSelector = document.createElement("select");
-            for (const device of this.#mediaDevices) {
-                if (device.kind === "videoinput" && device.deviceId) {
-                    const deviceOption = document.createElement("option");
-                    deviceOption.value = device.deviceId;
-                    deviceOption.textContent = device.label || device.deviceId;
-                    deviceSelector.options.add(deviceOption);
+
+            const buildDeviceList = () => {
+                while (deviceSelector.options.length) deviceSelector.options.remove(0);
+                for (const device of this.#mediaDevices) {
+                    if (device.kind === "videoinput" && device.deviceId) {
+                        const deviceOption = document.createElement("option");
+                        deviceOption.value = device.deviceId;
+                        deviceOption.textContent = device.label || device.deviceId;
+                        deviceSelector.options.add(deviceOption);
+                    }
                 }
             }
+
+            buildDeviceList();
+
             deviceSelector.addEventListener("change", ev => {
                 if (deviceSelector.value) {
                     this.requestCameraImage(deviceSelector.value);
@@ -220,6 +227,22 @@ export class Monitor extends HTMLElement {
             selectCamera.innerText = "Select Camera";
             selectCamera.addEventListener("click", ev => this.setGUIState("active"))
             deviceForm.appendChild(selectCamera);
+
+            const refreshDevices = document.createElement("button");
+            refreshDevices.innerText = "Refresh Device List";
+            refreshDevices.addEventListener("click", ev => {
+                navigator.mediaDevices.enumerateDevices()
+                .then(mediaDevices => {
+                    this.updateDevices(mediaDevices);
+                    // this.setGUIState("select-device");
+                    buildDeviceList();
+                })
+                .catch(err => {
+                    // TODO: handle failure to get camera access
+                    console.error(err);
+                });
+            });
+            deviceForm.appendChild(refreshDevices);
 
             this.overlay.appendChild(deviceForm);
         }

@@ -39,12 +39,10 @@ ${SD_SHAPES}
 ${DRAW_ANTIALIASED}
 ${GLSL_COLORSPACE_CONVERSION}
 
-uniform sampler2D source_img;
 uniform vec2 resolution;
 
 void main() {
     vec2 CbCr = (gl_FragCoord.xy / resolution) - vec2(0.5, 0.5);
-    //gl_FragColor = texture2D(source_img, CbCr);
 
     vec3 col = YCbCrToRGB(vec3(0.5, CbCr));
     
@@ -125,6 +123,15 @@ export class Vectorscope extends AbstractWebGLScope {
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.ONE, gl.ONE);
+
+        const sourceImg = this.videoSource.textureSource;
+        this._texOpts = {
+            src: sourceImg,
+            auto: false,
+            minMag: gl.LINEAR,
+            wrap: gl.CLAMP_TO_EDGE,
+        };
+        this._imgTex = twgl.createTexture(gl, this._texOpts);
     }
 
     drawScope() {
@@ -141,11 +148,9 @@ export class Vectorscope extends AbstractWebGLScope {
 
         gl.useProgram(this.backgroundProgramInfo.program);
         twgl.setBuffersAndAttributes(gl, this.backgroundProgramInfo, this.backgroundBufferInfo);
-        const imgTex = twgl.createTexture(gl, {
-            src: sourceImg
-        });
+        twgl.setTextureFromElement(gl, this._imgTex, sourceImg, this._texOpts)
         twgl.setUniforms(this.backgroundProgramInfo, {
-            source_img: imgTex,
+            source_img: this._imgTex,
             resolution: [gl.canvas.width, gl.canvas.height],
         });
         twgl.drawBufferInfo(gl, this.backgroundBufferInfo);
@@ -158,7 +163,7 @@ export class Vectorscope extends AbstractWebGLScope {
         twgl.setBuffersAndAttributes(gl, this.distributionProgramInfo,
             this._pixelIdBufferInfo.buffers);
         twgl.setUniforms(this.distributionProgramInfo, {
-            source_img: imgTex,
+            source_img: this._imgTex,
             resolution: [sourceImg.width, sourceImg.height],
         });
 

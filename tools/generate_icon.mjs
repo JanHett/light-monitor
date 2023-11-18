@@ -54,8 +54,8 @@ void main() {
 // === SHADER EXECUTION ===
 
 const canvas = document.getElementById("icon");
-canvas.width = 512;
-canvas.height = 512;
+canvas.width = 1024;
+canvas.height = 1024;
 
 const gl = canvas.getContext("webgl", { colorSpace: "srgb" });
 const ext = gl.getExtension("OES_texture_float");
