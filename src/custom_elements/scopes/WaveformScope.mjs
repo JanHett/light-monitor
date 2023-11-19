@@ -73,7 +73,7 @@ class AbstractWaveformScope extends AbstractWebGLScope {
 
         gl.useProgram(this.backgroundProgramInfo.program);
         twgl.setBuffersAndAttributes(gl, this.backgroundProgramInfo, this.backgroundBufferInfo);
-        twgl.setTextureFromElement(gl, this._imgTex, sourceImg, this._texOpts)
+        twgl.setTextureFromElement(gl, this._imgTex, sourceImg, this._texOpts);
         twgl.setUniforms(this.backgroundProgramInfo, {
             source_img: this._imgTex,
             resolution: [gl.canvas.width, gl.canvas.height],
@@ -95,7 +95,7 @@ class AbstractWaveformScope extends AbstractWebGLScope {
         gl.useProgram(this.guidelineProgramInfo.program);
         twgl.setBuffersAndAttributes(gl, this.guidelineProgramInfo, this.guidelineBufferInfo);
         twgl.setUniforms(this.guidelineProgramInfo, {
-            color: [1,1,1]
+            color: [0.5,0.5,0.5]
         })
         twgl.drawBufferInfo(gl, this.guidelineBufferInfo, gl.LINES);
     }

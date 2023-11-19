@@ -77,6 +77,7 @@ export class ScopeStack extends HTMLElement {
 
         .scope-stack-container {
             display: flex;
+            overflow: scroll;
         }
 
         .scope-wrapper {

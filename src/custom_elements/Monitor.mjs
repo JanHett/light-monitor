@@ -80,11 +80,13 @@ export class Monitor extends HTMLElement {
         this.overlay.id = "overlay";
 
         const settings = document.createElement("div");
+        settings.id = "settings";
         // anamorphic squeeze
         const anamorphicSqueeze = document.createElement("input");
         anamorphicSqueeze.id = "anamorphic-squeeze";
         const anamorphicSqueezeLabel = document.createElement("label");
         anamorphicSqueezeLabel.setAttribute("for", "anamorphic-squeeze");
+        anamorphicSqueezeLabel.textContent = "Anamorphic Squeeze";
         anamorphicSqueeze.setAttribute("type", "number");
         anamorphicSqueeze.setAttribute("step", "0.1");
         anamorphicSqueeze.value = 1;
@@ -98,6 +100,7 @@ export class Monitor extends HTMLElement {
         aspectRatio.id = "aspect-ratio";
         const aspectRatioLabel = document.createElement("label");
         aspectRatioLabel.setAttribute("for", "aspect-ratio");
+        aspectRatioLabel.textContent = "Aspect Ratio";
         aspectRatio.setAttribute("type", "number");
         aspectRatio.setAttribute("step", "0.1");
         aspectRatio.addEventListener("change", () => {
@@ -122,9 +125,17 @@ export class Monitor extends HTMLElement {
             position: relative;
         }
 
+        #settings {
+            color: #fff;
+            padding: 0.5em 0.7em;
+        }
+
+        #settings :not(:last-child) {
+            margin-right: 1em;
+        }
+
         #display-canvas {
             width: 100%;
-            /* object-fit: cover;*/
         }
 
         #overlay.shade {
@@ -275,7 +286,7 @@ export class Monitor extends HTMLElement {
             gl.useProgram(this.#programInfo.program);
             twgl.setBuffersAndAttributes(gl, this.#programInfo,
                 this.#bufferInfo);
-            twgl.setTextureFromElement(gl, imgTex, image, texOpts)
+            twgl.setTextureFromElement(gl, imgTex, image, texOpts);
             twgl.setUniforms(this.#programInfo, {
                 source_img: imgTex,
                 resolution: [gl.canvas.width, gl.canvas.height],

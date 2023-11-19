@@ -148,7 +148,7 @@ export class Vectorscope extends AbstractWebGLScope {
 
         gl.useProgram(this.backgroundProgramInfo.program);
         twgl.setBuffersAndAttributes(gl, this.backgroundProgramInfo, this.backgroundBufferInfo);
-        twgl.setTextureFromElement(gl, this._imgTex, sourceImg, this._texOpts)
+        twgl.setTextureFromElement(gl, this._imgTex, sourceImg, this._texOpts);
         twgl.setUniforms(this.backgroundProgramInfo, {
             source_img: this._imgTex,
             resolution: [gl.canvas.width, gl.canvas.height],
